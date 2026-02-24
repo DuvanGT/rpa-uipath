@@ -29,7 +29,7 @@ jobs:
           $pwdPath = (Get-Location).Path
           $projectJsonPath = Join-Path $pwdPath 'project.json'
           $items = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch "\\output\\" } | Select-Object -ExpandProperty FullName
-          if (Test-Path $projectJsonPath -PathType Leaf -and -not ($items -contains $projectJsonPath)) { $items += $projectJsonPath }
+          if ((Test-Path $projectJsonPath -PathType Leaf) -and -not ($items -contains $projectJsonPath)) { $items += $projectJsonPath }
           Compress-Archive -LiteralPath $items -DestinationPath (Join-Path -Path $outputDir -ChildPath $pkgName) -Force
 
       - name: Guardar el artefacto compilado
