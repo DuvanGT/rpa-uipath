@@ -19,18 +19,18 @@ jobs:
           echo "Robot finalizado con éxito."
 
       # Usamos la acción oficial de UiPath para empaquetar
-      # - name: Pack Robot (Compilar)
-      #   uses: UiPath/uipath-automation-package@v4
-      #   with:
-      #     projectJsonPath: 'project.json'
-      #     outputPath: 'output'
-      #     version: '1.0.${{ github.run_number }}' # Versión automática
+      - name: Pack Robot (Compilar)
+        uses: UiPath/uipath-automation-package@v4
+        with:
+          projectJsonPath: 'project.json'
+          outputPath: 'output'
+          version: '1.0.${{ github.run_number }}' # Versión automática
 
-      # - name: Guardar el artefacto compilado
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: RobotCompilado
-      #     path: output/
+      - name: Guardar el artefacto compilado
+        uses: actions/upload-artifact@v3
+        with:
+          name: RobotCompilado
+          path: output/
   deploy:
     needs: build
     runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
