@@ -31,3 +31,16 @@ jobs:
       #   with:
       #     name: RobotCompilado
       #     path: output/
+  deploy:
+    needs: build
+    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
+    
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+      
+      - name: Ejecutar Robot (Simulación de Log)
+        run: |
+          echo "Iniciando Robot..."
+          echo "Hola Mundo desde el Pipeline de GitHub"
+          echo "Robot finalizado con éxito."
