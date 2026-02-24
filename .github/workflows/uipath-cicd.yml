@@ -49,6 +49,12 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v3
       
+      - name: Descargar artefacto compilado
+        uses: actions/download-artifact@v4
+        with:
+          name: RobotCompilado
+          path: output/
+      
       - name: Ejecutar Robot (Simulación de Log)
         run: |
           echo "Iniciando Robot..."
