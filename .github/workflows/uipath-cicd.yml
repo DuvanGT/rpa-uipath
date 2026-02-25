@@ -142,7 +142,7 @@ jobs:
       #     }
 
       - name: Desplegar paquete al Orchestrator (Automation Cloud)
-        shell: powershell
+        shell: pwsh
         env:
           UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH }}
           UIPATH_TENANT_NAME: DefaultTenant
