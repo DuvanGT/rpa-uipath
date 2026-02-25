@@ -66,3 +66,13 @@ jobs:
       #     # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
       #     packagePath: 'output' 
       #     folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
+      - name: Desplegar paquete al Orchestrator
+        uses: UiPath/uipath-automation-deploy@v4
+        with:
+          orchestratorUrl: 'https://cloud.uipath.com'
+          orchestratorTenant: 'DefaultTenant'
+          accountName: ${{ secrets.UIPATH }}   # Verifica que en GitHub se llame UIPATH y sea 'quind'
+          clientId: ${{ secrets.APP_ID }}      # Verifica que sea tu App ID
+          clientSecret: ${{ secrets.APP_SECRET }} # Verifica que sea tu Secret
+          packagePath: 'output' 
+          folderName: 'Shared'
