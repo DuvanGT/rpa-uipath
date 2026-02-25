@@ -67,7 +67,7 @@ jobs:
       #     packagePath: 'output' 
       #     folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
       - name: Desplegar paquete al Orchestrator
-        uses: UiPath/uipath-automation-deploy@v4
+        uses: UiPath/uipath-automation-deploy@v2
         with:
           orchestratorUrl: 'https://cloud.uipath.com'
           orchestratorTenant: 'DefaultTenant'
