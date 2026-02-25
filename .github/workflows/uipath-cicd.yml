@@ -18,22 +18,25 @@ jobs:
           echo "Hola Mundo desde el Pipeline de GitHub"
           echo "Ajuste"
       # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
-      - name: Pack Robot (Compilar)
+# Empaquetado oficial usando UiPath CLI
+      - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
           $version = "1.0.${{ github.run_number }}"
           $outputDir = "output"
-          if (-Not (Test-Path -Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
-          $zipName = "Robot-$($version).zip"
-          $pkgName = "Robot-$($version).nupkg"
-          $pwdPath = (Get-Location).Path
-          $projectJsonPath = Join-Path $pwdPath 'project.json'
-          $items = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch "\\output\\" } | Select-Object -ExpandProperty FullName
-          if ((Test-Path $projectJsonPath -PathType Leaf) -and -not ($items -contains $projectJsonPath)) { $items += $projectJsonPath }
-          Compress-Archive -LiteralPath $items -DestinationPath (Join-Path -Path $outputDir -ChildPath $zipName) -Force
-          $zipPath = Join-Path -Path $outputDir -ChildPath $zipName
-          $pkgPath = Join-Path -Path $outputDir -ChildPath $pkgName
-          Move-Item -Path $zipPath -Destination $pkgPath -Force
+          New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+          
+          Write-Host "1. Descargando la herramienta oficial UiPath CLI..."
+          # Descargamos el CLI oficial de UiPath desde la galería pública de NuGet
+          nuget install UiPath.CLI.Windows -OutputDirectory tools -ExcludeVersion
+          $cliPath = "tools\UiPath.CLI.Windows\tools\uipcli.exe"
+          
+          Write-Host "2. Empaquetando el proyecto con la estructura correcta..."
+          # El comando 'pack' lee tu project.json, compila y crea el .nupkg real
+          & $cliPath package pack project.json -o $outputDir -v $version
+          
+          Write-Host "¡Empaquetado listo! Verificando archivo:"
+          Get-ChildItem -Path $outputDir
 
       - name: Guardar el artefacto compilado
         uses: actions/upload-artifact@v4
