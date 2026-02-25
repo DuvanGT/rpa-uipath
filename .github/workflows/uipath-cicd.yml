@@ -2,33 +2,53 @@ name: UiPath CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: # Permite ejecutarlo manualmente para pruebas
+    branches: [ main ] # Se ejecuta cada vez que subes algo a main
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
+    
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4 # Actualizado a v4
+        uses: actions/checkout@v3
+      
+      - name: Ejecutar Robot (Simulación de Log)
+        run: |
+          echo "Iniciando Robot..."
+          echo "Hola Mundo desde el Pipeline de GitHub"
+          echo "Robot finalizado con éxito."
 
+      # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
       - name: Pack Robot (Compilar)
-        uses: UiPath/uipath-automation-package@v4 # Usamos la oficial para evitar errores de formato
-        with:
-          projectJsonPath: 'project.json'
-          outputPath: 'output'
-          version: '1.0.${{ github.run_number }}'
+        shell: powershell
+        run: |
+          $version = "1.0.${{ github.run_number }}"
+          $outputDir = "output"
+          if (-Not (Test-Path -Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
+          $zipName = "Robot-$($version).zip"
+          $pkgName = "Robot-$($version).nupkg"
+          $pwdPath = (Get-Location).Path
+          $projectJsonPath = Join-Path $pwdPath 'project.json'
+          $items = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch "\\output\\" } | Select-Object -ExpandProperty FullName
+          if ((Test-Path $projectJsonPath -PathType Leaf) -and -not ($items -contains $projectJsonPath)) { $items += $projectJsonPath }
+          Compress-Archive -LiteralPath $items -DestinationPath (Join-Path -Path $outputDir -ChildPath $zipName) -Force
+          $zipPath = Join-Path -Path $outputDir -ChildPath $zipName
+          $pkgPath = Join-Path -Path $outputDir -ChildPath $pkgName
+          Move-Item -Path $zipPath -Destination $pkgPath -Force
 
       - name: Guardar el artefacto compilado
         uses: actions/upload-artifact@v4
         with:
           name: RobotCompilado
           path: output/
-
   deploy:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
+    
     steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+      
       - name: Descargar artefacto compilado
         uses: actions/download-artifact@v4
         with:
@@ -39,9 +59,10 @@ jobs:
         uses: UiPath/uipath-automation-deploy@v4
         with:
           orchestratorUrl: 'https://cloud.uipath.com'
-          orchestratorTenant: 'DefaultTenant'
-          accountName: ${{ secrets.UIPATH }}   # Verifica que en GitHub se llame UIPATH y sea 'quind'
-          clientId: ${{ secrets.APP_ID }}      # Verifica que sea tu App ID
-          clientSecret: ${{ secrets.APP_SECRET }} # Verifica que sea tu Secret
+          orchestratorTenant: 'DefaultTenant'  # Cambia esto si tu Tenant tiene otro nombre
+          accountName: ${{ secrets.UIPATH }}
+          clientId: ${{ secrets.APP_ID }}
+          clientSecret: ${{ secrets.APP_SECRET }}
+          # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
           packagePath: 'output' 
-          folderName: 'Shared'
+          folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
