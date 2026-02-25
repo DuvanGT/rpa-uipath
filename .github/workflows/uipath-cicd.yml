@@ -18,7 +18,7 @@ jobs:
           echo "Hola Mundo desde el Pipeline de GitHub"
           echo "Ajuste"
       # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
-# Empaquetado oficial usando UiPath CLI
+# Empaquetado oficial usando UiPath CLI (Versión .NET)
       - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
@@ -26,14 +26,17 @@ jobs:
           $outputDir = "output"
           New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
           
-          Write-Host "1. Descargando la herramienta oficial UiPath CLI..."
-          # Descargamos el CLI oficial de UiPath desde la galería pública de NuGet
-          nuget install UiPath.CLI.Windows -OutputDirectory tools -ExcludeVersion
-          $cliPath = "tools\UiPath.CLI.Windows\tools\uipcli.exe"
+          Write-Host "1. Preparando el manifiesto de herramientas .NET..."
+          # Crea un entorno local para instalar herramientas de forma segura
+          dotnet new tool-manifest
           
-          Write-Host "2. Empaquetando el proyecto con la estructura correcta..."
-          # El comando 'pack' lee tu project.json, compila y crea el .nupkg real
-          & $cliPath package pack project.json -o $outputDir -v $version
+          Write-Host "2. Instalando UiPath CLI oficial..."
+          # Descarga la herramienta en su nuevo formato DotnetTool
+          dotnet tool install UiPath.CLI.Windows
+          
+          Write-Host "3. Empaquetando el proyecto con la estructura correcta..."
+          # Usamos 'dotnet tool run' para ejecutar uipcli sin problemas de rutas
+          dotnet tool run uipcli package pack project.json -o $outputDir -v $version
           
           Write-Host "¡Empaquetado listo! Verificando archivo:"
           Get-ChildItem -Path $outputDir
