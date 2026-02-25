@@ -16,8 +16,6 @@ jobs:
         run: |
           echo "Iniciando Robot..."
           echo "Hola Mundo desde el Pipeline de GitHub"
-          echo "Robot finalizado con éxito."
-
       # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
       - name: Pack Robot (Compilar)
         shell: powershell
