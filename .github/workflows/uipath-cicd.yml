@@ -55,14 +55,14 @@ jobs:
           name: RobotCompilado
           path: output/
       
-      - name: Desplegar paquete al Orchestrator
-        uses: UiPath/uipath-automation-deploy@v4
-        with:
-          orchestratorUrl: 'https://cloud.uipath.com'
-          orchestratorTenant: 'DefaultTenant'  # Cambia esto si tu Tenant tiene otro nombre
-          accountName: ${{ secrets.UIPATH }}
-          clientId: ${{ secrets.APP_ID }}
-          clientSecret: ${{ secrets.APP_SECRET }}
-          # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
-          packagePath: 'output' 
-          folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
+      # - name: Desplegar paquete al Orchestrator
+      #   uses: UiPath/uipath-automation-deploy@v4
+      #   with:
+      #     orchestratorUrl: 'https://cloud.uipath.com'
+      #     orchestratorTenant: 'DefaultTenant'  # Cambia esto si tu Tenant tiene otro nombre
+      #     accountName: ${{ secrets.UIPATH }}
+      #     clientId: ${{ secrets.APP_ID }}
+      #     clientSecret: ${{ secrets.APP_SECRET }}
+      #     # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
+      #     packagePath: 'output' 
+      #     folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
