@@ -69,10 +69,10 @@ jobs:
       - name: Desplegar paquete al Orchestrator (Automation Cloud)
         shell: powershell
         env:
-          UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH_ACCOUNT_LOGICAL_NAME }}
-          UIPATH_TENANT_NAME: ${{ secrets.UIPATH_TENANT_NAME }}
-          UIPATH_CLIENT_ID: ${{ secrets.UIPATH_CLIENT_ID }}
-          UIPATH_CLIENT_SECRET: ${{ secrets.UIPATH_CLIENT_SECRET }}
+          UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH }}
+          UIPATH_TENANT_NAME: DefaultTenant
+          UIPATH_CLIENT_ID: ${{ secrets.APP_ID }}
+          UIPATH_CLIENT_SECRET: ${{ secrets.APP_SECRET }}
         run: |
           Write-Host "Buscando .nupkg en output/"
           $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
