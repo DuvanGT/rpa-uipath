@@ -66,13 +66,78 @@ jobs:
       #     # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
       #     packagePath: 'output' 
       #     folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
-      - name: Desplegar paquete al Orchestrator
-        uses: UiPath/uipath-automation-deploy@v2
-        with:
-          orchestratorUrl: 'https://cloud.uipath.com'
-          orchestratorTenant: 'DefaultTenant'
-          accountName: ${{ secrets.UIPATH }}   # Verifica que en GitHub se llame UIPATH y sea 'quind'
-          clientId: ${{ secrets.APP_ID }}      # Verifica que sea tu App ID
-          clientSecret: ${{ secrets.APP_SECRET }} # Verifica que sea tu Secret
-          packagePath: 'output' 
-          folderName: 'Shared'
+      - name: Desplegar paquete al Orchestrator (Automation Cloud)
+        shell: powershell
+        env:
+          UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH_ACCOUNT_LOGICAL_NAME }}
+          UIPATH_TENANT_NAME: ${{ secrets.UIPATH_TENANT_NAME }}
+          UIPATH_CLIENT_ID: ${{ secrets.UIPATH_CLIENT_ID }}
+          UIPATH_CLIENT_SECRET: ${{ secrets.UIPATH_CLIENT_SECRET }}
+        run: |
+          Write-Host "Buscando .nupkg en output/"
+          $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
+          if (-not $pkg) {
+            Write-Error "No se encontró ningún .nupkg en output/"
+            exit 1
+          }
+          Write-Host "Encontrado paquete: $($pkg.Name)"
+
+          $account = $env:UIPATH_ACCOUNT_LOGICAL_NAME
+          $tenant = $env:UIPATH_TENANT_NAME
+          $clientId = $env:UIPATH_CLIENT_ID
+          $clientSecret = $env:UIPATH_CLIENT_SECRET
+          if (-not ($account -and $tenant -and $clientId -and $clientSecret)) {
+            Write-Error "Faltan secretos necesarios. Añade UIPATH_ACCOUNT_LOGICAL_NAME, UIPATH_TENANT_NAME, UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET"
+            exit 1
+          }
+
+          Write-Host "Autenticando en Account API..."
+          $tokenEndpoint = 'https://account.uipath.com/oauth/token'
+          $body = @{
+            grant_type = 'client_credentials'
+            client_id = $clientId
+            client_secret = $clientSecret
+          }
+          try {
+            $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
+          } catch {
+            Write-Error "Error authenticating: $_"
+            exit 1
+          }
+          $accessToken = $resp.access_token
+          if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Account API"; exit 1 }
+
+          $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Packages/UiPath.Server.Configuration.OData.UploadPackage"
+          Write-Host "Subiendo paquete a: $orchUploadUrl"
+
+          # Construir multipart/form-data manualmente
+          $filePath = $pkg.FullName
+          $fileName = $pkg.Name
+          $boundary = [System.Guid]::NewGuid().ToString()
+          $LF = "`r`n"
+          $header = "--$boundary$LF" + "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"$LF" + "Content-Type: application/octet-stream$LF$LF"
+          $footer = "$LF--$boundary--$LF"
+
+          $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
+          $enc = [System.Text.Encoding]::UTF8
+          $mem = New-Object System.IO.MemoryStream
+          $writer = New-Object System.IO.StreamWriter($mem, $enc)
+          $writer.Write($header)
+          $writer.Flush()
+          $mem.Write($fileBytes, 0, $fileBytes.Length)
+          $writer.Write($footer)
+          $writer.Flush()
+          $mem.Position = 0
+
+          $client = New-Object System.Net.Http.HttpClient
+          $client.DefaultRequestHeaders.Add('Authorization', "Bearer $accessToken")
+          $content = New-Object System.Net.Http.StreamContent($mem)
+          $content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("multipart/form-data; boundary=$boundary")
+          $response = $client.PostAsync($orchUploadUrl, $content).Result
+          $respBody = $response.Content.ReadAsStringAsync().Result
+          if ($response.IsSuccessStatusCode) {
+            Write-Host "Paquete subido correctamente. Response: $respBody"
+          } else {
+            Write-Error "Error subiendo paquete: $($response.StatusCode) - $respBody"
+            exit 1
+          }
