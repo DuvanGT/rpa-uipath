@@ -183,38 +183,28 @@ jobs:
           $accessToken = $resp.access_token
           if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Identity API"; exit 1 }
 
-          # URL corregida usando /odata/Processes/ en lugar de Packages
           $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.UploadPackage"
           Write-Host "Subiendo paquete a: $orchUploadUrl"
 
-          # Construir multipart/form-data manualmente
+          # NUEVA FORMA: Subida nativa y limpia compatible con GitHub Actions
           $filePath = $pkg.FullName
-          $fileName = $pkg.Name
-          $boundary = [System.Guid]::NewGuid().ToString()
-          $LF = "`r`n"
-          $header = "--$boundary$LF" + "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"$LF" + "Content-Type: application/octet-stream$LF$LF"
-          $footer = "$LF--$boundary--$LF"
-
-          $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
-          $enc = [System.Text.Encoding]::UTF8
-          $mem = New-Object System.IO.MemoryStream
-          $writer = New-Object System.IO.StreamWriter($mem, $enc)
-          $writer.Write($header)
-          $writer.Flush()
-          $mem.Write($fileBytes, 0, $fileBytes.Length)
-          $writer.Write($footer)
-          $writer.Flush()
-          $mem.Position = 0
-
-          $client = New-Object System.Net.Http.HttpClient
-          $client.DefaultRequestHeaders.Add('Authorization', "Bearer $accessToken")
-          $content = New-Object System.Net.Http.StreamContent($mem)
-          $content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("multipart/form-data; boundary=$boundary")
-          $response = $client.PostAsync($orchUploadUrl, $content).Result
-          $respBody = $response.Content.ReadAsStringAsync().Result
-          if ($response.IsSuccessStatusCode) {
-            Write-Host "Paquete subido correctamente. Response: $respBody"
-          } else {
-            Write-Error "Error subiendo paquete: $($response.StatusCode) - $respBody"
-            exit 1
+          
+          $headers = @{
+              Authorization = "Bearer $accessToken"
+          }
+          
+          $form = @{
+              file = Get-Item -Path $filePath
+          }
+          
+          try {
+              $uploadResp = Invoke-RestMethod -Method Post -Uri $orchUploadUrl -Headers $headers -Form $form
+              Write-Host "¡Paquete subido correctamente al Orchestrator!"
+          } catch {
+              Write-Error "Error subiendo paquete: $_"
+              # Si UiPath rechaza el paquete, esto nos dirá exactamente por qué
+              if ($_.ErrorDetails) {
+                  Write-Error "Detalles de UiPath: $($_.ErrorDetails.Message)"
+              }
+              exit 1
           }
