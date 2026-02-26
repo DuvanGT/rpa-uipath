@@ -1,2 +1,0 @@
-# rpa-uipath
-prueba sencilla
