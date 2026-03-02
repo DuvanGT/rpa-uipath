@@ -192,10 +192,11 @@ jobs:
         with:
           project: 'UiPath RPA'
           path: '.'
-          format: 'SARIF'
+          format: 'HTML'
           args: >
             --enableExperimental
             --failOnCVSS 7
+            -o ./reports
       
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -444,7 +445,7 @@ jobs:
           Write-Host "Respuesta de UiPath: $responseBody"
 
           if ($httpCode -match '^20') {
-              Write-Host "¡BINGO! Paquete subido correctamente al Orchestrator."
+              Write-Host "Paquete subido correctamente al Orchestrator."
           } else {
               Write-Error "Error subiendo paquete. Revisa la respuesta arriba."
               exit 1
