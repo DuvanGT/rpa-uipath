@@ -69,63 +69,63 @@ jobs:
           $vulnCount = ($depList | Where-Object { $_.Vulnerable }).Count
           
           $html = @"
-      <!DOCTYPE html>
-      <html>
-      <head>
-      <meta charset="UTF-8">
-      <title>Reporte de Dependencias - UiPath RPA</title>
-      <style>
-      body { font-family: Arial; margin: 20px; background: #f5f5f5; }
-      .container { background: white; padding: 20px; border-radius: 8px; }
-      h1 { border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
-      .safe { color: green; font-weight: bold; }
-      .vuln { color: #d32f2f; font-weight: bold; }
-      .alert { background: #fff3cd; padding: 10px; margin: 15px 0; }
-      .footer { margin-top: 20px; font-size: 12px; color: #999; }
-      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-      th { background: #0078d4; color: white; padding: 10px; text-align: left; }
-      td { padding: 10px; border-bottom: 1px solid #ddd; }
-      tr.vulnerable { background: #ffebee; }
-      </style>
-      </head>
-      <body>
-      <div class="container">
-      <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
-      <p><strong>Generado:</strong> $timestamp</p>
-      <p><strong>Total:</strong> $($depList.Count) | <span class="vuln">$vulnCount Vulnerables</span></p>
-      "@
-          
-          if ($vulnCount -gt 0) {
-            $html += "<div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) vulnerables.</div>"
-          }
-          
-          if ($depList.Count -gt 0) {
-            $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>"
-            
-            foreach ($dep in $depList) {
-              if ($dep.Vulnerable) {
-                $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>"
-              } else {
-                $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>"
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <meta charset="UTF-8">
+          <title>Reporte de Dependencias - UiPath RPA</title>
+          <style>
+          body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+          .container { background: white; padding: 20px; border-radius: 8px; }
+          h1 { border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
+          .safe { color: green; font-weight: bold; }
+          .vuln { color: #d32f2f; font-weight: bold; }
+          .alert { background: #fff3cd; padding: 10px; margin: 15px 0; }
+          .footer { margin-top: 20px; font-size: 12px; color: #999; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #0078d4; color: white; padding: 10px; text-align: left; }
+          td { padding: 10px; border-bottom: 1px solid #ddd; }
+          tr.vulnerable { background: #ffebee; }
+          </style>
+          </head>
+          <body>
+          <div class="container">
+          <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
+          <p><strong>Generado:</strong> $timestamp</p>
+          <p><strong>Total:</strong> $($depList.Count) | <span class="vuln">$vulnCount Vulnerables</span></p>
+          "@
+              
+              if ($vulnCount -gt 0) {
+                $html += "<div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) vulnerables.</div>"
               }
-            }
-            
-            $html += "</table>"
-          } else {
-            $html += "<p><em>Sin dependencias adicionales.</em></p>"
-          }
-          
-          $html += @"
-      <div class="footer">
-      <p>Generado automáticamente por CI/CD.</p>
-      </div>
-      </div>
-      </body>
-      </html>
-      "@
-          
-          $html | Out-File "reports/dependencias-report.html"
-          Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
+              
+              if ($depList.Count -gt 0) {
+                $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>"
+                
+                foreach ($dep in $depList) {
+                  if ($dep.Vulnerable) {
+                    $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>"
+                  } else {
+                    $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>"
+                  }
+                }
+                
+                $html += "</table>"
+              } else {
+                $html += "<p><em>Sin dependencias adicionales.</em></p>"
+              }
+              
+              $html += @"
+          <div class="footer">
+          <p>Generado automáticamente por CI/CD.</p>
+          </div>
+          </div>
+          </body>
+          </html>
+          "@
+              
+              $html | Out-File "reports/dependencias-report.html"
+              Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
         with:
