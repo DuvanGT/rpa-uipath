@@ -2,7 +2,7 @@ name: UiPath CI/CD Pipeline
 
 on:
   push:
-    branches: [ develop ] # Se ejecuta cada vez que subes algo a develop
+    branches: [ develops ] # Se ejecuta cada vez que subes algo a main
 
 jobs:
   build:
@@ -18,107 +18,60 @@ jobs:
           echo "Hola Mundo desde el Pipeline de GitHub"
           echo "Ajuste"
 
-#       - name: Analizar dependencias y generar reporte HTML
-#         shell: powershell
-#         run: |
-#           Write-Host "Leyendo project.json para dependencias..."
-#           $j = Get-Content project.json | ConvertFrom-Json
-          
-#           if (-Not (Test-Path -Path reports)) { New-Item -ItemType Directory -Path reports | Out-Null }
-          
-#           $deps = @{}
-#           $depList = @()
-          
-#           if ($j.dependencies) {
-#             $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
-#               $prop = $_.Name
-#               $deps[$prop] = $j.dependencies.$prop
-#               $depList += @{ Name = $prop; Version = $j.dependencies.$prop }
-#             }
-#           }
-          
-#           $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-#           $html = @"
-# <!DOCTYPE html>
-# <html>
-# <head>
-#     <meta charset="UTF-8">
-#     <title>Reporte de Dependencias UiPath</title>
-#     <style>
-#         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
-#         .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-#         h1 { color: #333; border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
-#         .info { background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin: 15px 0; }
-#         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-#         th { background-color: #0078d4; color: white; padding: 12px; text-align: left; }
-#         td { padding: 12px; border-bottom: 1px solid #ddd; }
-#         tr:hover { background-color: #f9f9f9; }
-#         .no-deps { color: #d32f2f; font-weight: bold; }
-#         .footer { margin-top: 20px; font-size: 12px; color: #999; }
-#     </style>
-# </head>
-# <body>
-#     <div class="container">
-#         <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
-#         <div class="info">
-#             <p><strong>Proyecto:</strong> my-rpa</p>
-#             <p><strong>Generado:</strong> $timestamp</p>
-#             <p><strong>Total de dependencias:</strong> $($depList.Count)</p>
-#         </div>
-# "@
-          
-#           if ($depList.Count -eq 0) {
-#             $html += "        <p class='no-deps'>❌ No se encontraron dependencias listadas.</p>`n"
-#           } else {
-#             $html += "        <table>`n"
-#             $html += "            <tr><th>Nombre del Paquete</th><th>Versión</th></tr>`n"
-#             foreach ($dep in $depList) {
-#               $html += "            <tr><td>$($dep.Name)</td><td><code>$($dep.Version)</code></td></tr>`n"
-#             }
-#             $html += "        </table>`n"
-#           }
-          
-#           $html += @"
-#         <div class="footer">
-#             <p>Reporte generado automáticamente por CI/CD.</p>
-#         </div>
-#     </div>
-# </body>
-# </html>
-# "@
-          
-#           $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
-#           Write-Host "✅ Reporte HTML generado en: reports/dependencias-report.html"
-#           Write-Host ""
-#           Write-Host "Dependencias encontradas:"
-#           if ($depList.Count -eq 0) {
-#             Write-Host "  ❌ Ninguna"
-#           } else {
-#             $depList | ForEach-Object { Write-Host "  ✓ $($_.Name) : $($_.Version)" }
-#           }
-      
-      - name: Subir reporte de dependencias
-        uses: actions/upload-artifact@v4
-        with:
-          name: DependenciesReport
-          path: reports/
-
-      - name: Pack Robot (Empaquetar proyecto)
+      - name: Analizar dependencias del proyecto
         shell: powershell
         run: |
-          $version = "1.0.${{ github.run_number }}"
+          Write-Host "Leyendo project.json para dependencias..."
+
+          $j = Get-Content project.json | ConvertFrom-Json
+          if ($j.dependencies) {
+            # convertir a diccionario si es PSCustomObject
+            $deps = @{}
+            $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
+              $prop = $_.Name
+              $deps[$prop] = $j.dependencies.$prop
+            }
+            if ($deps.Count -eq 0) {
+              Write-Host "  Ninguna dependencia encontrada."
+            } else {
+              $deps.GetEnumerator() | ForEach-Object { Write-Host "  $($_.Key) : $($_.Value)" }
+            }
+          } else {
+            Write-Host "  Ninguna dependencia encontrada."
+          }
+          # opcional: consulta rápida a NuGet.org si está disponible
+          if (Get-Command nuget -ErrorAction SilentlyContinue) {
+            Write-Host "Consultando versiones en NuGet.org..."
+            $deps.GetEnumerator() | ForEach-Object {
+              $name = $_.Key
+              $latest = nuget list $name -AllVersions | Select-String -Pattern "^$name" | Select-Object -Last 1
+              Write-Host "  $latest"
+            }
+          } else {
+            Write-Host "NuGet CLI no disponible, omitiendo comprobación de versiones.";
+          }
+      # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
+# Empaquetado oficial usando UiPath CLI (Versión .NET)
+      - name: Pack Robot (Compilar Oficialmente)
+        shell: powershell
+        run: |
+          $version = "1.0.${{ github.run_number }}.${{ github.run_attempt }}"
           $outputDir = "output"
           New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
           
-          Write-Host "Creando paquete .nupkg..."
-          $items = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch "\\output\\" -and $_.FullName -notmatch "\\.git\\" } | Select-Object -ExpandProperty FullName
-          $zipPath = Join-Path $outputDir "Robot-$version.zip"
-          Compress-Archive -LiteralPath $items -DestinationPath $zipPath -Force
+          Write-Host "1. Preparando el manifiesto de herramientas .NET..."
+          # Crea un entorno local para instalar herramientas de forma segura
+          dotnet new tool-manifest
           
-          $nupkgPath = Join-Path $outputDir "Robot-$version.nupkg"
-          Move-Item -Path $zipPath -Destination $nupkgPath -Force
+          Write-Host "2. Instalando UiPath CLI oficial..."
+          # Descarga la herramienta en su nuevo formato DotnetTool
+          dotnet tool install UiPath.CLI.Windows
           
-          Write-Host "✅ Paquete listo:"
+          Write-Host "3. Empaquetando el proyecto con la estructura correcta..."
+          # Usamos 'dotnet tool run' para ejecutar uipcli sin problemas de rutas
+          dotnet tool run uipcli package pack project.json -o $outputDir -v $version
+          
+          Write-Host "¡Empaquetado listo! Verificando archivo:"
           Get-ChildItem -Path $outputDir
 
       - name: Guardar el artefacto compilado
@@ -128,7 +81,7 @@ jobs:
           path: output/
   deploy:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
     
     steps:
       - name: Checkout del código
@@ -140,9 +93,227 @@ jobs:
           name: RobotCompilado
           path: output/
       
-      - name: Verificar paquete descargado
-        shell: powershell
+      # - name: Desplegar paquete al Orchestrator
+      #   uses: UiPath/uipath-automation-deploy@v4
+      #   with:
+      #     orchestratorUrl: 'https://cloud.uipath.com'
+      #     orchestratorTenant: 'DefaultTenant'  # Cambia esto si tu Tenant tiene otro nombre
+      #     accountName: ${{ secrets.UIPATH }}
+      #     clientId: ${{ secrets.APP_ID }}
+      #     clientSecret: ${{ secrets.APP_SECRET }}
+      #     # Aquí le decimos que busque el archivo en la carpeta donde lo descargaste
+      #     packagePath: 'output' 
+      #     folderName: 'Shared' # La carpeta del Orchestrator (Shared es la estándar)
+      # - name: Desplegar paquete al Orchestrator (Automation Cloud)
+      #   shell: powershell
+      #   env:
+      #     UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH }}
+      #     UIPATH_TENANT_NAME: DefaultTenant
+      #     UIPATH_CLIENT_ID: ${{ secrets.APP_ID }}
+      #     UIPATH_CLIENT_SECRET: ${{ secrets.APP_SECRET }}
+      #   run: |
+      #     Write-Host "Buscando .nupkg en output/"
+      #     $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
+      #     if (-not $pkg) {
+      #       Write-Error "No se encontró ningún .nupkg en output/"
+      #       exit 1
+      #     }
+      #     Write-Host "Encontrado paquete: $($pkg.Name)"
+
+      #     $account = $env:UIPATH_ACCOUNT_LOGICAL_NAME
+      #     $tenant = $env:UIPATH_TENANT_NAME
+      #     $clientId = $env:UIPATH_CLIENT_ID
+      #     $clientSecret = $env:UIPATH_CLIENT_SECRET
+      #     if (-not ($account -and $tenant -and $clientId -and $clientSecret)) {
+      #       Write-Error "Faltan secretos necesarios. Añade UIPATH_ACCOUNT_LOGICAL_NAME, UIPATH_TENANT_NAME, UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET"
+      #       exit 1
+      #     }
+
+      #     Write-Host "Autenticando en Account API..."
+      #     $tokenEndpoint = 'https://account.uipath.com/oauth/token'
+      #     $body = @{
+      #       grant_type = 'client_credentials'
+      #       client_id = $clientId
+      #       client_secret = $clientSecret
+      #     }
+      #     try {
+      #       $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
+      #     } catch {
+      #       Write-Error "Error authenticating: $_"
+      #       exit 1
+      #     }
+      #     $accessToken = $resp.access_token
+      #     if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Account API"; exit 1 }
+
+      #     $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Packages/UiPath.Server.Configuration.OData.UploadPackage"
+      #     Write-Host "Subiendo paquete a: $orchUploadUrl"
+
+      #     # Construir multipart/form-data manualmente
+      #     $filePath = $pkg.FullName
+      #     $fileName = $pkg.Name
+      #     $boundary = [System.Guid]::NewGuid().ToString()
+      #     $LF = "`r`n"
+      #     $header = "--$boundary$LF" + "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"$LF" + "Content-Type: application/octet-stream$LF$LF"
+      #     $footer = "$LF--$boundary--$LF"
+
+      #     $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
+      #     $enc = [System.Text.Encoding]::UTF8
+      #     $mem = New-Object System.IO.MemoryStream
+      #     $writer = New-Object System.IO.StreamWriter($mem, $enc)
+      #     $writer.Write($header)
+      #     $writer.Flush()
+      #     $mem.Write($fileBytes, 0, $fileBytes.Length)
+      #     $writer.Write($footer)
+      #     $writer.Flush()
+      #     $mem.Position = 0
+
+      #     $client = New-Object System.Net.Http.HttpClient
+      #     $client.DefaultRequestHeaders.Add('Authorization', "Bearer $accessToken")
+      #     $content = New-Object System.Net.Http.StreamContent($mem)
+      #     $content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("multipart/form-data; boundary=$boundary")
+      #     $response = $client.PostAsync($orchUploadUrl, $content).Result
+      #     $respBody = $response.Content.ReadAsStringAsync().Result
+      #     if ($response.IsSuccessStatusCode) {
+      #       Write-Host "Paquete subido correctamente. Response: $respBody"
+      #     } else {
+      #       Write-Error "Error subiendo paquete: $($response.StatusCode) - $respBody"
+      #       exit 1
+      #     }
+
+      # - name: Desplegar paquete al Orchestrator (Automation Cloud)
+      #   shell: pwsh
+      #   env:
+      #     UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH }}
+      #     UIPATH_TENANT_NAME: DefaultTenant
+      #     UIPATH_CLIENT_ID: ${{ secrets.APP_ID }}
+      #     UIPATH_CLIENT_SECRET: ${{ secrets.APP_SECRET }}
+      #   run: |
+      #     Write-Host "Buscando .nupkg en output/"
+      #     $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
+      #     if (-not $pkg) {
+      #       Write-Error "No se encontró ningún .nupkg en output/"
+      #       exit 1
+      #     }
+      #     Write-Host "Encontrado paquete: $($pkg.Name)"
+
+      #     $account = $env:UIPATH_ACCOUNT_LOGICAL_NAME
+      #     $tenant = $env:UIPATH_TENANT_NAME
+      #     $clientId = $env:UIPATH_CLIENT_ID
+      #     $clientSecret = $env:UIPATH_CLIENT_SECRET
+      #     if (-not ($account -and $tenant -and $clientId -and $clientSecret)) {
+      #       Write-Error "Faltan secretos necesarios. Añade UIPATH_ACCOUNT_LOGICAL_NAME, UIPATH_TENANT_NAME, UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET"
+      #       exit 1
+      #     }
+
+      #     Write-Host "Autenticando en Identity API de UiPath..."
+      #     $tokenEndpoint = 'https://cloud.uipath.com/identity_/connect/token'
+      #     $body = @{
+      #       grant_type = 'client_credentials'
+      #       client_id = $clientId
+      #       client_secret = $clientSecret
+      #       scope = 'OR.Execution OR.Folders'
+      #     }
+      #     try {
+      #       $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
+      #     } catch {
+      #       Write-Error "Error authenticating: $_"
+      #       exit 1
+      #     }
+      #     $accessToken = $resp.access_token
+      #     if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Identity API"; exit 1 }
+
+      #     $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.UploadPackage"
+      #     Write-Host "Subiendo paquete a: $orchUploadUrl"
+
+      #     # NUEVA FORMA: Subida nativa y limpia compatible con GitHub Actions
+      #     $filePath = $pkg.FullName
+          
+      #     $headers = @{
+      #         Authorization = "Bearer $accessToken"
+      #     }
+          
+      #     $form = @{
+      #         file = Get-Item -Path $filePath
+      #     }
+          
+      #     try {
+      #         $uploadResp = Invoke-RestMethod -Method Post -Uri $orchUploadUrl -Headers $headers -Form $form
+      #         Write-Host "¡Paquete subido correctamente al Orchestrator!"
+      #     } catch {
+      #         Write-Error "Error subiendo paquete: $_"
+      #         # Si UiPath rechaza el paquete, esto nos dirá exactamente por qué
+      #         if ($_.ErrorDetails) {
+      #             Write-Error "Detalles de UiPath: $($_.ErrorDetails.Message)"
+      #         }
+      #         exit 1
+      #     }
+
+      - name: Desplegar paquete al Orchestrator (Automation Cloud)
+        shell: pwsh
+        env:
+          UIPATH_ACCOUNT_LOGICAL_NAME: ${{ secrets.UIPATH }}
+          UIPATH_TENANT_NAME: DefaultTenant
+          UIPATH_CLIENT_ID: ${{ secrets.APP_ID }}
+          UIPATH_CLIENT_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          Write-Host "Archivos descargados en output/:"
-          Get-ChildItem -Path output/
-          Write-Host "✅ Artefacto listo para desplegar a UiPath Orchestrator"
+          Write-Host "Buscando .nupkg en output/"
+          $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
+          if (-not $pkg) {
+            Write-Error "No se encontró ningún .nupkg en output/"
+            exit 1
+          }
+          Write-Host "Encontrado paquete: $($pkg.Name)"
+
+          $account = $env:UIPATH_ACCOUNT_LOGICAL_NAME
+          $tenant = $env:UIPATH_TENANT_NAME
+          $clientId = $env:UIPATH_CLIENT_ID
+          $clientSecret = $env:UIPATH_CLIENT_SECRET
+          if (-not ($account -and $tenant -and $clientId -and $clientSecret)) {
+            Write-Error "Faltan secretos necesarios. Añade UIPATH_ACCOUNT_LOGICAL_NAME, UIPATH_TENANT_NAME, UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET"
+            exit 1
+          }
+
+          Write-Host "Autenticando en Identity API de UiPath..."
+          $tokenEndpoint = 'https://cloud.uipath.com/identity_/connect/token'
+          $body = @{
+            grant_type = 'client_credentials'
+            client_id = $clientId
+            client_secret = $clientSecret
+            scope = 'OR.Execution OR.Folders'
+          }
+          try {
+            $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
+          } catch {
+            Write-Error "Error authenticating: $_"
+            exit 1
+          }
+          $accessToken = $resp.access_token
+          if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Identity API"; exit 1 }
+
+          $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.UploadPackage"
+          Write-Host "Subiendo paquete a: $orchUploadUrl"
+
+          $filePath = $pkg.FullName
+          $fileSize = (Get-Item $filePath).Length
+          Write-Host "Tamaño del archivo a subir: $fileSize bytes"
+          
+          # Validación de seguridad para evitar el error 1654 por archivo vacío
+          if ($fileSize -eq 0) {
+              Write-Error "¡Alto ahí! El archivo .nupkg está vacío (0 bytes). Revisa el paso de tu pipeline donde descargas el artefacto."
+              exit 1
+          }
+
+          Write-Host "Ejecutando subida con curl.exe para formateo perfecto..."
+          # Usamos curl.exe nativo que jamás falla con el formato multipart
+          $httpCode = curl.exe -s -w "%{http_code}" -o result.json -X POST "$orchUploadUrl" -H "Authorization: Bearer $accessToken" -F "file=@$filePath"
+          
+          $responseBody = Get-Content result.json -Raw
+          Write-Host "Código HTTP devuelto: $httpCode"
+          Write-Host "Respuesta de UiPath: $responseBody"
+
+          if ($httpCode -match '^20') {
+              Write-Host "¡BINGO! Paquete subido correctamente al Orchestrator."
+          } else {
+              Write-Error "Error subiendo paquete. Revisa la respuesta arriba."
+              exit 1
+          }
