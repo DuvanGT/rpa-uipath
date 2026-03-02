@@ -260,7 +260,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=rpa-uipath
-            -Dsonar.organization=YOUR_SONARCLOUD_ORG
+            -Dsonar.organization=DuvanGT
       
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
