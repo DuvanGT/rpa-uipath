@@ -27,15 +27,35 @@ jobs:
           # Crear carpeta reports
           if (-Not (Test-Path -Path reports)) { New-Item -ItemType Directory -Path reports | Out-Null }
           
+          # Base de datos de vulnerabilidades conocidas
+          $vulnerabilities = @{
+            "Newtonsoft.Json" = @("11.0.1", "11.0.2", "12.0.0", "12.0.1")
+            "System.Net.Http" = @("4.3.0", "4.3.1")
+            "System.Net.Primitives" = @("4.3.0")
+          }
+          
           $deps = @{}
           $depList = @()
           
           if ($j.dependencies) {
             $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
               $prop = $_.Name
-              $deps[$prop] = $j.dependencies.$prop
-              $depList += @{ Name = $prop; Version = $j.dependencies.$prop }
-              Write-Host "  $prop : $($j.dependencies.$prop)"
+              $version = $j.dependencies.$prop -replace '[\[\]]', ''
+              $deps[$prop] = $version
+              
+              # Verificar vulnerabilidades
+              $vulnerable = $false
+              if ($vulnerabilities.ContainsKey($prop)) {
+                if ($vulnerabilities[$prop] -contains $version) {
+                  $vulnerable = $true
+                  Write-Host "  ⚠️  $prop : $version (VULNERABLE)"
+                }
+              }
+              
+              $depList += @{ Name = $prop; Version = $version; Vulnerable = $vulnerable }
+              if (-not $vulnerable) {
+                Write-Host "  ✓ $prop : $version"
+              }
             }
           } else {
             Write-Host "  Ninguna dependencia encontrada."
@@ -43,6 +63,7 @@ jobs:
           
           # Generar HTML
           $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          $vulnCount = ($depList | Where-Object { $_.Vulnerable }).Count
           $html = @"
           <!DOCTYPE html>
           <html>
@@ -54,10 +75,14 @@ jobs:
               .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
               h1 { color: #333; border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
               .info { background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 15px 0; }
+              .alert { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; }
               th { background: #0078d4; color: white; padding: 12px; text-align: left; }
               td { padding: 12px; border-bottom: 1px solid #ddd; }
+              tr.vulnerable { background: #ffebee; }
               tr:hover { background: #f9f9f9; }
+              .safe { color: green; font-weight: bold; }
+              .vuln { color: #d32f2f; font-weight: bold; }
               .footer { margin-top: 20px; font-size: 12px; color: #999; }
             </style>
           </head>
@@ -67,22 +92,33 @@ jobs:
               <div class="info">
                 <p><strong>Proyecto:</strong> my-rpa</p>
                 <p><strong>Generado:</strong> $timestamp</p>
-                <p><strong>Total:</strong> $($depList.Count) dependencia(s)</p>
+                <p><strong>Total:</strong> $($depList.Count) dependencia(s) | <span class="vuln">$vulnCount Vulnerables</span></p>
               </div>
-          "@
-                    if ($depList.Count -eq 0) {
-                      $html += "    <p><em>Sin dependencias adicionales.</em></p>"
-                    } else {
-                      $html += "    <table><tr><th>Paquete</th><th>Versión</th></tr>"
-                      foreach ($dep in $depList) {
-                        $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td></tr>"
-                      }
-                      $html += "    </table>"
-                    }
-                    $html += "    <div class='footer'><p>Generado automáticamente por CI/CD.</p></div></div></body></html>"
-                    
-                    $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
-                    Write-Host "✅ Reporte HTML guardado en: reports/dependencias-report.html"
+"@
+          
+          if ($vulnCount -gt 0) {
+            $html += "              <div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) con vulnerabilidades conocidas. Considera actualizar.</div>`n"
+          }
+          
+          if ($depList.Count -eq 0) {
+            $html += "              <p><em>Sin dependencias adicionales.</em></p>"
+          } else {
+            $html += "              <table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>`n"
+            foreach ($dep in $depList) {
+              if ($dep.Vulnerable) {
+                $html += "              <tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>`n"
+              } else {
+                $html += "              <tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>`n"
+              }
+            }
+            $html += "              </table>"
+          }
+          
+          $html += "              <div class='footer'><p>Generado automáticamente por CI/CD. Base de datos de vulnerabilidades actualizada a 2026-03-02.</p></div>`n"
+          $html += "            </div></body></html>"
+          
+          $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
+          Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
 
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
