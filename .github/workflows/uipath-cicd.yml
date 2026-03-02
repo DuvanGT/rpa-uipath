@@ -94,31 +94,31 @@ jobs:
                 <p><strong>Generado:</strong> $timestamp</p>
                 <p><strong>Total:</strong> $($depList.Count) dependencia(s) | <span class="vuln">$vulnCount Vulnerables</span></p>
               </div>
-"@
-          
-          if ($vulnCount -gt 0) {
-            $html += "              <div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) con vulnerabilidades conocidas. Considera actualizar.</div>`n"
-          }
-          
-          if ($depList.Count -eq 0) {
-            $html += "              <p><em>Sin dependencias adicionales.</em></p>"
-          } else {
-            $html += "              <table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>`n"
-            foreach ($dep in $depList) {
-              if ($dep.Vulnerable) {
-                $html += "              <tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>`n"
-              } else {
-                $html += "              <tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>`n"
-              }
-            }
-            $html += "              </table>"
-          }
-          
-          $html += "              <div class='footer'><p>Generado automáticamente por CI/CD. Base de datos de vulnerabilidades actualizada a 2026-03-02.</p></div>`n"
-          $html += "            </div></body></html>"
-          
-          $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
-          Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
+          "@
+                    
+                    if ($vulnCount -gt 0) {
+                      $html += "              <div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) con vulnerabilidades conocidas. Considera actualizar.</div>`n"
+                    }
+                    
+                    if ($depList.Count -eq 0) {
+                      $html += "              <p><em>Sin dependencias adicionales.</em></p>"
+                    } else {
+                      $html += "              <table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>`n"
+                      foreach ($dep in $depList) {
+                        if ($dep.Vulnerable) {
+                          $html += "              <tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>`n"
+                        } else {
+                          $html += "              <tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>`n"
+                        }
+                      }
+                      $html += "              </table>"
+                    }
+                    
+                    $html += "              <div class='footer'><p>Generado automáticamente por CI/CD. Base de datos de vulnerabilidades actualizada a 2026-03-02.</p></div>`n"
+                    $html += "            </div></body></html>"
+                    
+                    $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
+                    Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
 
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
