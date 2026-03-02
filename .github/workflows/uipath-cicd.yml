@@ -2,7 +2,7 @@ name: UiPath CI/CD Pipeline
 
 on:
   push:
-    branches: [ develop ] # Se ejecuta cada vez que subes algo a main
+    branches: [ develops ] # Se ejecuta cada vez que subes algo a main
 
 jobs:
   build:
