@@ -79,11 +79,17 @@ jobs:
               @{ Version = "12.0.1"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" }
             )
             "System.Net.Http" = @(
-              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818"); Description = "TLS downgrade attack vulnerability" },
+              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818", "CVE-2016-9069"); Description = "TLS downgrade attack vulnerability and HTTP header injection" },
               @{ Version = "4.3.1"; CVEs = @("CVE-2016-3818"); Description = "TLS downgrade attack vulnerability" }
             )
             "System.Net.Primitives" = @(
               @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818"); Description = "TLS protocol vulnerability" }
+            )
+            "log4net" = @(
+              @{ Version = "2.0.8"; CVEs = @("CVE-2018-1285"); Description = "Deserialization of untrusted data vulnerability in log4net" }
+            )
+            "Owin" = @(
+              @{ Version = "1.0.0"; CVEs = @("CVE-2016-7412"); Description = "Cookie authentication vulnerability allowing privilege elevation" }
             )
           }
           
