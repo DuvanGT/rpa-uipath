@@ -4,8 +4,7 @@
   "description": "",
   "main": "Main.xaml",
   "dependencies": {
-    "UiPath.System.Activities": "[25.12.2]",
-    "Newtonsoft.Json": "[11.0.1]"
+    "UiPath.System.Activities": "[25.12.2]"
   },
   "webServices": [],
   "entitiesStores": [],
