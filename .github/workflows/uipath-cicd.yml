@@ -232,15 +232,16 @@ jobs:
             --failOnCVSS 7
             -o ./reports
       
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+      - name: SonarCloud Scan (CLI)
+        uses: SonarSource/sonarqube-scan-action@v4
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.projectKey=rpa-uipath
-            -Dsonar.organization=DuvanGT
+            -Dsonar.projectKey=DuvanGT_rpa-uipath
+            -Dsonar.organization=duvangt
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
       
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
