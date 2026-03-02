@@ -198,17 +198,10 @@ jobs:
             --failOnCVSS 7
             -o ./reports
       
-      - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: ./reports/dependency-check-report.html
-          category: 'dependency-check'
-        if: always()
-      
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
         with:
-          name: DependenciesReport
+          name: SAST-Report
           path: reports/
 
   
