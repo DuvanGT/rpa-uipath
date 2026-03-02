@@ -2,7 +2,7 @@ name: UiPath CI/CD Pipeline
 
 on:
   push:
-    branches: [ develop ] # Se ejecuta cada vez que subes algo a main
+    branches: [ develops ] # Se ejecuta cada vez que subes algo a main
 
 jobs:
   build:
@@ -24,15 +24,25 @@ jobs:
           Write-Host "Leyendo project.json para dependencias..."
           $j = Get-Content project.json | ConvertFrom-Json
           if ($j.dependencies) {
-            $j.dependencies.GetEnumerator() | ForEach-Object { Write-Host "  $($_.Name) : $($_.Value)" }
+            # convertir a diccionario si es PSCustomObject
+            $deps = @{}
+            $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
+              $prop = $_.Name
+              $deps[$prop] = $j.dependencies.$prop
+            }
+            if ($deps.Count -eq 0) {
+              Write-Host "  Ninguna dependencia encontrada."
+            } else {
+              $deps.GetEnumerator() | ForEach-Object { Write-Host "  $($_.Key) : $($_.Value)" }
+            }
           } else {
             Write-Host "  Ninguna dependencia encontrada."
           }
           # opcional: consulta rápida a NuGet.org si está disponible
           if (Get-Command nuget -ErrorAction SilentlyContinue) {
             Write-Host "Consultando versiones en NuGet.org..."
-            $j.dependencies.GetEnumerator() | ForEach-Object {
-              $name = $_.Name
+            $deps.GetEnumerator() | ForEach-Object {
+              $name = $_.Key
               $latest = nuget list $name -AllVersions | Select-String -Pattern "^$name" | Select-Object -Last 1
               Write-Host "  $latest"
             }
