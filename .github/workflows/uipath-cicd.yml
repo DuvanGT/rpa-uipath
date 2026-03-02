@@ -18,6 +18,40 @@ jobs:
           echo "Hola Mundo desde el Pipeline de GitHub"
           echo "Ajuste"
 
+      - name: Pack Robot (Compilar Oficialmente)
+        shell: powershell
+        run: |
+          $version = "1.0.${{ github.run_number }}.${{ github.run_attempt }}"
+          $outputDir = "output"
+          New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+          
+          Write-Host "1. Preparando el manifiesto de herramientas .NET..."
+          # Crea un entorno local para instalar herramientas de forma segura
+          dotnet new tool-manifest
+          
+          Write-Host "2. Instalando UiPath CLI oficial..."
+          # Descarga la herramienta en su nuevo formato DotnetTool
+          dotnet tool install UiPath.CLI.Windows
+          
+          Write-Host "3. Empaquetando el proyecto con la estructura correcta..."
+          # Usamos 'dotnet tool run' para ejecutar uipcli sin problemas de rutas
+          dotnet tool run uipcli package pack project.json -o $outputDir -v $version
+          
+          Write-Host "¡Empaquetado listo! Verificando archivo:"
+          Get-ChildItem -Path $outputDir
+
+      - name: Guardar el artefacto compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: RobotCompilado
+          path: output/
+
+  vulnerabilities:
+    needs: build
+    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
+    
+    steps:
+
       - name: Analizar dependencias del proyecto
         shell: pwsh
         run: |
@@ -153,37 +187,9 @@ jobs:
         with:
           name: DependenciesReport
           path: reports/
-      # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
-# Empaquetado oficial usando UiPath CLI (Versión .NET)
-      - name: Pack Robot (Compilar Oficialmente)
-        shell: powershell
-        run: |
-          $version = "1.0.${{ github.run_number }}.${{ github.run_attempt }}"
-          $outputDir = "output"
-          New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-          
-          Write-Host "1. Preparando el manifiesto de herramientas .NET..."
-          # Crea un entorno local para instalar herramientas de forma segura
-          dotnet new tool-manifest
-          
-          Write-Host "2. Instalando UiPath CLI oficial..."
-          # Descarga la herramienta en su nuevo formato DotnetTool
-          dotnet tool install UiPath.CLI.Windows
-          
-          Write-Host "3. Empaquetando el proyecto con la estructura correcta..."
-          # Usamos 'dotnet tool run' para ejecutar uipcli sin problemas de rutas
-          dotnet tool run uipcli package pack project.json -o $outputDir -v $version
-          
-          Write-Host "¡Empaquetado listo! Verificando archivo:"
-          Get-ChildItem -Path $outputDir
-
-      - name: Guardar el artefacto compilado
-        uses: actions/upload-artifact@v4
-        with:
-          name: RobotCompilado
-          path: output/
+  
   deploy:
-    needs: build
+    needs: vulnerabilities
     runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
     
     steps:
