@@ -32,11 +32,21 @@ jobs:
             New-Item -ItemType Directory -Path reports | Out-Null 
           }
           
-          # Base de datos de vulnerabilidades conocidas
+          # Base de datos de vulnerabilidades conocidas con detalles
           $vulnerabilities = @{
-            "Newtonsoft.Json"      = @("11.0.1", "11.0.2", "12.0.0", "12.0.1")
-            "System.Net.Http"      = @("4.3.0", "4.3.1")
-            "System.Net.Primitives"= @("4.3.0")
+            "Newtonsoft.Json" = @(
+              @{ Version = "11.0.1"; CVEs = @("CVE-2019-0821", "CVE-2017-9822"); Description = "Unsafe deserialization allowing arbitrary code execution" },
+              @{ Version = "11.0.2"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" },
+              @{ Version = "12.0.0"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" },
+              @{ Version = "12.0.1"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" }
+            )
+            "System.Net.Http" = @(
+              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818"); Description = "TLS downgrade attack vulnerability" },
+              @{ Version = "4.3.1"; CVEs = @("CVE-2016-3818"); Description = "TLS downgrade attack vulnerability" }
+            )
+            "System.Net.Primitives" = @(
+              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818"); Description = "TLS protocol vulnerability" }
+            )
           }
           
           $depList = @()
@@ -47,14 +57,22 @@ jobs:
               $version = $j.dependencies.$prop -replace '[\[\]]', ''
               
               $vulnerable = $false
+              $vulnDetails = @()
+              
               if ($vulnerabilities.ContainsKey($prop)) {
-                if ($vulnerabilities[$prop] -contains $version) {
+                $vulnInfo = $vulnerabilities[$prop] | Where-Object { $_.Version -eq $version }
+                if ($vulnInfo) {
                   $vulnerable = $true
+                  $vulnDetails = $vulnInfo
                   Write-Host "⚠️  $prop : $version (VULNERABLE)"
+                  foreach ($vuln in $vulnDetails) {
+                    Write-Host "      └─ CVEs: $($vuln.CVEs -join ', ')"
+                    Write-Host "      └─ $($vuln.Description)"
+                  }
                 }
               }
               
-              $depList += @{ Name = $prop; Version = $version; Vulnerable = $vulnerable }
+              $depList += @{ Name = $prop; Version = $version; Vulnerable = $vulnerable; VulnDetails = $vulnDetails }
               
               if (-not $vulnerable) {
                 Write-Host "✓ $prop : $version"
@@ -86,6 +104,8 @@ jobs:
           th { background: #0078d4; color: white; padding: 10px; text-align: left; }
           td { padding: 10px; border-bottom: 1px solid #ddd; }
           tr.vulnerable { background: #ffebee; }
+          .cves { font-family: monospace; font-size: 12px; color: #d32f2f; }
+          .cve-desc { font-size: 12px; color: #666; margin-top: 5px; font-style: italic; }
           </style>
           </head>
           <body>
@@ -100,13 +120,15 @@ jobs:
               }
               
               if ($depList.Count -gt 0) {
-                $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th></tr>"
+                $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th><th>Detalles</th></tr>"
                 
                 foreach ($dep in $depList) {
                   if ($dep.Vulnerable) {
-                    $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td></tr>"
+                    $cveList = ($dep.VulnDetails | ForEach-Object { $_.CVEs -join ", " }) -join ", "
+                    $description = ($dep.VulnDetails.Description) -join " | "
+                    $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td><td><div class='cves'>CVEs: $cveList</div><div class='cve-desc'>$description</div></td></tr>"
                   } else {
-                    $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td></tr>"
+                    $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td><td>Sin vulnerabilidades conocidas</td></tr>"
                   }
                 }
                 
