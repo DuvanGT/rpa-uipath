@@ -18,12 +18,6 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v3
       
-      - name: Ejecutar Robot (Simulación de Log)
-        run: |
-          echo "Iniciando Robot..."
-          echo "Hola Mundo desde el Pipeline de GitHub"
-          echo "Ajuste"
-
       - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
