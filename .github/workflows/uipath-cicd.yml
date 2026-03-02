@@ -49,9 +49,9 @@ jobs:
   vulnerabilities:
     needs: build
     runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
-    
     steps:
-
+      - name: Checkout del código
+        uses: actions/checkout@v3
       - name: Analizar dependencias del proyecto
         shell: pwsh
         run: |
