@@ -48,7 +48,7 @@ jobs:
 
   vulnerabilities:
     needs: build
-    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
+    runs-on: ubuntu-latest # Importante: UiPath requiere Windows para compilar
     steps:
       - name: Checkout del código
         uses: actions/checkout@v3
