@@ -22,6 +22,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Leyendo project.json para dependencias..."
+          Write-Host "Leyendo project.json para dependencias..."
           $j = Get-Content project.json | ConvertFrom-Json
           if ($j.dependencies) {
             # convertir a diccionario si es PSCustomObject
