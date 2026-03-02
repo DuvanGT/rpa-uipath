@@ -18,38 +18,90 @@ jobs:
           echo "Hola Mundo desde el Pipeline de GitHub"
           echo "Ajuste"
 
-      - name: Analizar dependencias del proyecto
+      - name: Analizar dependencias y generar reporte HTML
         shell: powershell
         run: |
           Write-Host "Leyendo project.json para dependencias..."
-          Write-Host "Leyendo project.json para dependencias..."
           $j = Get-Content project.json | ConvertFrom-Json
+          
+          if (-Not (Test-Path -Path reports)) { New-Item -ItemType Directory -Path reports | Out-Null }
+          
+          $deps = @{}
+          $depList = @()
+          
           if ($j.dependencies) {
-            # convertir a diccionario si es PSCustomObject
-            $deps = @{}
             $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
               $prop = $_.Name
               $deps[$prop] = $j.dependencies.$prop
+              $depList += @{ Name = $prop; Version = $j.dependencies.$prop }
             }
-            if ($deps.Count -eq 0) {
-              Write-Host "  Ninguna dependencia encontrada."
-            } else {
-              $deps.GetEnumerator() | ForEach-Object { Write-Host "  $($_.Key) : $($_.Value)" }
-            }
-          } else {
-            Write-Host "  Ninguna dependencia encontrada."
           }
-          # opcional: consulta rápida a NuGet.org si está disponible
-          if (Get-Command nuget -ErrorAction SilentlyContinue) {
-            Write-Host "Consultando versiones en NuGet.org..."
-            $deps.GetEnumerator() | ForEach-Object {
-              $name = $_.Key
-              $latest = nuget list $name -AllVersions | Select-String -Pattern "^$name" | Select-Object -Last 1
-              Write-Host "  $latest"
-            }
+          
+          $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          $html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Dependencias UiPath</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
+        .info { background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin: 15px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background-color: #0078d4; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; }
+        tr:hover { background-color: #f9f9f9; }
+        .no-deps { color: #d32f2f; font-weight: bold; }
+        .footer { margin-top: 20px; font-size: 12px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
+        <div class="info">
+            <p><strong>Proyecto:</strong> my-rpa</p>
+            <p><strong>Generado:</strong> $timestamp</p>
+            <p><strong>Total de dependencias:</strong> $($depList.Count)</p>
+        </div>
+"@
+          
+          if ($depList.Count -eq 0) {
+            $html += "        <p class='no-deps'>❌ No se encontraron dependencias listadas.</p>`n"
           } else {
-            Write-Host "NuGet CLI no disponible, omitiendo comprobación de versiones.";
+            $html += "        <table>`n"
+            $html += "            <tr><th>Nombre del Paquete</th><th>Versión</th></tr>`n"
+            foreach ($dep in $depList) {
+              $html += "            <tr><td>$($dep.Name)</td><td><code>$($dep.Version)</code></td></tr>`n"
+            }
+            $html += "        </table>`n"
           }
+          
+          $html += @"
+        <div class="footer">
+            <p>Reporte generado automáticamente por CI/CD.</p>
+        </div>
+    </div>
+</body>
+</html>
+"@
+          
+          $html | Out-File -FilePath "reports/dependencias-report.html" -Encoding UTF8
+          Write-Host "✅ Reporte HTML generado en: reports/dependencias-report.html"
+          Write-Host ""
+          Write-Host "Dependencias encontradas:"
+          if ($depList.Count -eq 0) {
+            Write-Host "  ❌ Ninguna"
+          } else {
+            $depList | ForEach-Object { Write-Host "  ✓ $($_.Name) : $($_.Version)" }
+          }
+      
+      - name: Subir reporte de dependencias
+        uses: actions/upload-artifact@v4
+        with:
+          name: DependenciesReport
+          path: reports/
       # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
 # Empaquetado oficial usando UiPath CLI (Versión .NET)
       - name: Pack Robot (Compilar Oficialmente)
