@@ -201,7 +201,7 @@ jobs:
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
         with:
-          name: SAST-Report
+          name: SAST & SCA Report
           path: reports/
 
   
