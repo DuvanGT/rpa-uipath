@@ -102,8 +102,7 @@ jobs:
         with:
           name: DependenciesReport
           path: reports/
-      # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
-# Empaquetado oficial usando UiPath CLI (Versión .NET)
+
       - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
