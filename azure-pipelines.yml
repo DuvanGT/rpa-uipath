@@ -21,40 +21,49 @@ trigger:
 pool:
   vmImage: 'windows-latest'  # Igual que GitHub Actions
 
-steps:
-- checkout: self
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - checkout: self
 
-# Simulación de ejecución (logs)
-- script: |
-    echo "Iniciando Robot..."
-    echo "Hola Mundo desde Azure DevOps"
-    echo "Ajuste"
-  displayName: 'Ejecutar Robot (Simulación de Log)'
+    - powershell: |
+        $version = "1.0.$(Build.BuildId)"
+        $outputDir = "output"
 
-# Empaquetado con UiPath CLI
-- powershell: |
-    $version = "1.0.$(Build.BuildId)"
-    $outputDir = "output"
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
-    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+        dotnet new tool-manifest
+        dotnet tool install UiPath.CLI.Windows
+        dotnet tool run uipcli package pack project.json -o $outputDir -v $version
+      displayName: 'Pack Robot'
 
-    Write-Host "1. Preparando el manifiesto..."
-    dotnet new tool-manifest
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'output'
+        ArtifactName: 'RobotCompilado'
+        publishLocation: 'Container'
 
-    Write-Host "2. Instalando UiPath CLI..."
-    dotnet tool install UiPath.CLI.Windows
 
-    Write-Host "3. Empaquetando..."
-    dotnet tool run uipcli package pack project.json -o $outputDir -v $version
+# 🔽 TU DEPLOY (equivalente a "needs: build")
+- stage: Deploy
+  dependsOn: Build   # 👈 equivalente a needs: build
+  jobs:
+  - job: DeployJob
+    pool:
+      vmImage: 'windows-latest'
 
-    Get-ChildItem -Path $outputDir
-  displayName: 'Pack Robot (UiPath CLI)'
+    steps:
+    - checkout: self
 
-# Publicar artefacto
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: 'output'
-    ArtifactName: 'RobotCompilado'
-    publishLocation: 'Container'
-
+    # 👇 equivalente a download-artifact
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'RobotCompilado'
+        downloadPath: '$(System.ArtifactsDirectory)'
 
