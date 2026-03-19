@@ -10,11 +10,7 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: echo Hello, world!
+- script: ls -al
   displayName: 'Run a one-line script'
 
-- task: UiPathDeploy@6
-  inputs:
-    orchestratorConnection: 'uipath'
-    packagesPath: 'nu'
-    folderName: 'nu'
+
