@@ -33,21 +33,20 @@ steps:
 
 # Empaquetado con UiPath CLI
 - powershell: |
-    $version = "1.0.$(Build.BuildId).$(Rev:.r)"
+    $version = "1.0.$(Build.BuildId)"
     $outputDir = "output"
 
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
-    Write-Host "1. Preparando el manifiesto de herramientas .NET..."
+    Write-Host "1. Preparando el manifiesto..."
     dotnet new tool-manifest
 
-    Write-Host "2. Instalando UiPath CLI oficial..."
+    Write-Host "2. Instalando UiPath CLI..."
     dotnet tool install UiPath.CLI.Windows
 
-    Write-Host "3. Empaquetando el proyecto..."
+    Write-Host "3. Empaquetando..."
     dotnet tool run uipcli package pack project.json -o $outputDir -v $version
 
-    Write-Host "¡Empaquetado listo!"
     Get-ChildItem -Path $outputDir
   displayName: 'Pack Robot (UiPath CLI)'
 
