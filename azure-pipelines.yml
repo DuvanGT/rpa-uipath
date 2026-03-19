@@ -10,7 +10,9 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: ls -al
+- script: |
+    cd .github/workflows
+    cat uipath-cicd.yml
   displayName: 'Run a one-line script'
 
 
