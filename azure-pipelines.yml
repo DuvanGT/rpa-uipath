@@ -77,3 +77,4 @@ stages:
         orchestratorConnection: 'uipath'
         packagesPath: '$(System.ArtifactsDirectory)'
         folderName: 'Shared'
+        traceLevel: 'Critical'
