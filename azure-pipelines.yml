@@ -68,7 +68,7 @@ stages:
         downloadPath: '$(System.ArtifactsDirectory)'
     - task: UiPathDeploy@6
       inputs:
-        orchestratorConnection: 'testui'
+        orchestratorConnection: 'uipath'
         packagesPath: '$(System.ArtifactsDirectory)/RobotCompilado'
         folderName: 'Shared'
         traceLevel: 'Critical'
