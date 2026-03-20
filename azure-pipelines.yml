@@ -72,7 +72,7 @@ stages:
     #     packagesPath: '$(System.DefaultWorkingDirectory)'
     #     folderName: '$(ServerDirectory)'
     #     traceLevel: 'None'
-    - task: UiPathDeploy@2
+    - task: UiPathDeploy@6
       inputs:
         orchestratorConnection: 'uipath'
         packagesPath: '$(System.ArtifactsDirectory)'
