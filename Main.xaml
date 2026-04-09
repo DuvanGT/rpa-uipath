@@ -76,7 +76,7 @@
       <AssemblyReference>System.Linq.Expressions</AssemblyReference>
     </sco:Collection>
   </TextExpression.ReferencesForImplementation>
-  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="727,412" sap2010:WorkflowViewState.IdRef="Sequence_1">
+  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="584,412" sap2010:WorkflowViewState.IdRef="Sequence_1">
     <Sequence.Variables>
       <Variable x:TypeArguments="x:String" Name="misaludo" />
     </Sequence.Variables>
@@ -85,11 +85,7 @@
         <x:Boolean x:Key="IsExpanded">True</x:Boolean>
       </scg:Dictionary>
     </sap:WorkflowViewStateService.ViewState>
-    <ui:InputDialog Options="{x:Null}" OptionsString="{x:Null}" DisplayName="Cuadro de diálogo de entrada" sap:VirtualizedContainerService.HintSize="450,275" sap2010:WorkflowViewState.IdRef="InputDialog_2" IsPassword="False" Label="Saluda" Title="My bot" TopMost="False">
-      <ui:InputDialog.Result>
-        <OutArgument x:TypeArguments="x:String">[misaludo]</OutArgument>
-      </ui:InputDialog.Result>
-    </ui:InputDialog>
+    <ui:InputDialog Label="{x:Null}" Options="{x:Null}" OptionsString="{x:Null}" Result="{x:Null}" Title="{x:Null}" DisplayName="Cuadro de diálogo de entrada" sap2010:WorkflowViewState.IdRef="InputDialog_3" IsPassword="False" TopMost="False" />
     <ui:MessageBox Caption="{x:Null}" ChosenButton="{x:Null}" AutoCloseAfter="00:00:00" DisplayName="Bandeja de mensajes" sap:VirtualizedContainerService.HintSize="450,114" sap2010:WorkflowViewState.IdRef="MessageBox_1" Text="[misaludo]" />
   </Sequence>
 </Activity>

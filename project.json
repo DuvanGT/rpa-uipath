@@ -1,10 +1,14 @@
 {
-  "name": "rpa-test",
-  "projectId": "7dc5a57e-2189-4085-a7af-e78f494d4276",
-  "description": "Este mi primer robot simple",
+  "name": "my-rpa",
+  "projectId": "9764a11a-9967-41d3-81c4-1cb31ee39d23",
+  "description": "",
   "main": "Main.xaml",
   "dependencies": {
-    "UiPath.System.Activities": "[25.12.2]"
+    "UiPath.System.Activities": "[25.12.2]",
+    "Newtonsoft.Json": "[11.0.1]",
+    "log4net": "[2.0.8]",
+    "Owin": "[1.0.0]",
+    "System.Net.Http": "[4.3.0]"
   },
   "webServices": [],
   "entitiesStores": [],
@@ -16,8 +20,8 @@
     "netFrameworkLazyLoading": false,
     "isPausable": true,
     "isAttended": false,
-    "requiresUserInteraction": true,
-    "supportsPersistence": true,
+    "requiresUserInteraction": false,
+    "supportsPersistence": false,
     "workflowSerialization": "NewtonsoftJson",
     "excludedLoggedData": [
       "Private:*",
@@ -45,7 +49,7 @@
   "entryPoints": [
     {
       "filePath": "Main.xaml",
-      "uniqueId": "c5760d88-5e35-4d32-b2cd-fe53ef7c5d35",
+      "uniqueId": "bdb7b3e1-0e2f-4b45-9f88-60a51f0428c6",
       "input": [],
       "output": []
     }

@@ -1,6 +1,6 @@
 {
-  "Name": "rpa-test",
+  "Name": "my-rpa",
   "ProjectType": "Process",
-  "Description": "Este mi primer robot simple",
+  "Description": "",
   "MainFile": "Main.xaml"
 }
