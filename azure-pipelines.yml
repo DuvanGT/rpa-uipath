@@ -66,9 +66,3 @@ stages:
         downloadType: 'single'
         artifactName: 'RobotCompilado'
         downloadPath: '$(System.ArtifactsDirectory)'
-    - task: UiPathDeploy@2
-      inputs:
-        orchestratorConnection: 'uipath'
-        packagesPath: '$(System.ArtifactsDirectory)/RobotCompilado'
-        folderName: 'Shared'
-        traceLevel: 'Critical'
