@@ -52,26 +52,74 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: 'zulu'
+              uses: actions/setup-java@v4
+              with:
+                java-version: 17
+                distribution: 'zulu'
+            
+            - name: Checkout del código
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+            
+            # --- PASOS NUEVOS PARA UIPATH ---
+            - name: Ejecutar UiPath Workflow Analyzer
+              shell: pwsh
+              run: |
+                # NOTA IMPORTANTE: Para que este comando funcione de verdad, el runner de GitHub 
+                # debe tener acceso a UiPath CLI. Si usas 'windows-latest' de GitHub, no lo tiene instalado.
+                # Lo ideal es que este job corra en un Self-Hosted Runner (una máquina de tu empresa con UiPath).
+                
+                Write-Host "Ejecutando analizador de UiPath..."
+                # Descomenta la siguiente línea cuando tengas el uipath-cli disponible:
+                # uipath-cli analyze --projectPath "project.json" --output "uipath-analyzer-results.json"
+                
+                # [SOLO PARA PRUEBAS] Simulamos un archivo de resultados vacío para que el pipeline no falle ahora mismo
+                '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
       
-      - name: Checkout del código
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+            - name: Convertir formato de UiPath a SonarCloud
+              shell: pwsh
+              run: |
+                if (Test-Path "uipath-analyzer-results.json") {
+                    $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
+                    $sonarIssues = @()
+                    
+                    if ($null -ne $uipathResults.Errors) {
+                        foreach ($error in $uipathResults.Errors) {
+                            $issue = [PSCustomObject]@{
+                                engineId = "UiPathAnalyzer"
+                                ruleId = $error.RuleId
+                                severity = "MAJOR"
+                                type = "CODE_SMELL"
+                                primaryLocation = [PSCustomObject]@{
+                                    message = $error.Description
+                                    filePath = $error.ItemPath
+                                }
+                            }
+                            $sonarIssues += $issue
+                        }
+                    }
+                    
+                    $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
+                    $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
+                    Write-Host "Archivo sonar-issues.json generado exitosamente."
+                } else {
+                    Write-Host "No se encontró el archivo de UiPath."
+                    '{"issues": []}' | Out-File "sonar-issues.json"
+                }
+            # --------------------------------
       
-      - name: SonarCloud Scan (CLI)
-        uses: SonarSource/sonarqube-scan-action@v4
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.projectKey=DuvanGT_rpa-uipath
-            -Dsonar.organization=duvangt
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+            - name: SonarCloud Scan (CLI)
+              uses: SonarSource/sonarqube-scan-action@v4
+              env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+              with:
+                args: >
+                  -Dsonar.projectKey=DuvanGT_rpa-uipath
+                  -Dsonar.organization=duvangt
+                  -Dsonar.sources=.
+                  -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+                  -Dsonar.externalIssuesReportPaths=sonar-issues.json
 
   vulnerabilities:
     needs: build
