@@ -115,7 +115,7 @@ jobs:
                 SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
               with:
                 args: >
-                  -Dsonar.projectKey=DuvanGT_rpa-uipath
+                  -Dsonar.projectKey=DuvanGT_rpa-uipath-v2
                   -Dsonar.organization=duvangt
                   -Dsonar.sources=.
                   -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
