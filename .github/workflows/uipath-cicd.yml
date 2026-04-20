@@ -116,7 +116,7 @@ jobs:
               with:
                 args: >
                   -Dsonar.projectKey=DuvanGT_rpa-uipath
-                  -Dsonar.organization=duvangt
+                  -Dsonar.organization=quind
                   -Dsonar.sources=.
                   -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
                   -Dsonar.externalIssuesReportPaths=sonar-issues.json
