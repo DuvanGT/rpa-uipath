@@ -1,8 +1,15 @@
 name: UiPath CI/CD Pipeline
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main ] # Se ejecuta cada vez que subes algo a main
+    branches: [ develop ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  security-events: write
+  contents: read
 
 jobs:
   build:
@@ -12,13 +19,6 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v3
       
-      - name: Ejecutar Robot (Simulación de Log)
-        run: |
-          echo "Iniciando Robot..."
-          echo "Hola Mundo desde el Pipeline de GitHub"
-          echo "Ajuste"
-      # Empaquetado (sin acción externa): crear carpeta output y comprimir el proyecto
-# Empaquetado oficial usando UiPath CLI (Versión .NET)
       - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
@@ -46,8 +46,254 @@ jobs:
         with:
           name: RobotCompilado
           path: output/
-  deploy:
+
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: windows-latest
+    steps:
+            - name: Set up JDK 17
+              uses: actions/setup-java@v4
+              with:
+                java-version: 17
+                distribution: 'zulu'
+            
+            - name: Checkout del código
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+            
+            # --- PASOS NUEVOS PARA UIPATH ---
+            - name: Ejecutar UiPath Workflow Analyzer
+              shell: pwsh
+              run: |
+                # NOTA IMPORTANTE: Para que este comando funcione de verdad, el runner de GitHub 
+                # debe tener acceso a UiPath CLI. Si usas 'windows-latest' de GitHub, no lo tiene instalado.
+                # Lo ideal es que este job corra en un Self-Hosted Runner (una máquina de tu empresa con UiPath).
+                
+                Write-Host "Ejecutando analizador de UiPath..."
+                # Descomenta la siguiente línea cuando tengas el uipath-cli disponible:
+                # uipath-cli analyze --projectPath "project.json" --output "uipath-analyzer-results.json"
+                
+                # [SOLO PARA PRUEBAS] Simulamos un archivo de resultados vacío para que el pipeline no falle ahora mismo
+                '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
+      
+            - name: Convertir formato de UiPath a SonarCloud
+              shell: pwsh
+              run: |
+                if (Test-Path "uipath-analyzer-results.json") {
+                    $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
+                    $sonarIssues = @()
+                    
+                    if ($null -ne $uipathResults.Errors) {
+                        foreach ($error in $uipathResults.Errors) {
+                            $issue = [PSCustomObject]@{
+                                engineId = "UiPathAnalyzer"
+                                ruleId = $error.RuleId
+                                severity = "MAJOR"
+                                type = "CODE_SMELL"
+                                primaryLocation = [PSCustomObject]@{
+                                    message = $error.Description
+                                    filePath = $error.ItemPath
+                                }
+                            }
+                            $sonarIssues += $issue
+                        }
+                    }
+                    
+                    $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
+                    $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
+                    Write-Host "Archivo sonar-issues.json generado exitosamente."
+                } else {
+                    Write-Host "No se encontró el archivo de UiPath."
+                    '{"issues": []}' | Out-File "sonar-issues.json"
+                }
+            # --------------------------------
+      
+            - name: SonarCloud Scan (CLI)
+              uses: SonarSource/sonarqube-scan-action@v4
+              env:
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+              with:
+                args: >
+                  -Dsonar.projectKey=DuvanGT_rpa-uipath-v2
+                  -Dsonar.organization=duvangt
+                  -Dsonar.sources=.
+                  -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+                  -Dsonar.externalIssuesReportPaths=sonar-issues.json
+  vulnerabilities:
     needs: build
+    runs-on: ubuntu-latest # Importante: UiPath requiere Windows para compilar
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+      - name: Analizar dependencias del proyecto
+        shell: pwsh
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
+
+          Write-Host "Leyendo project.json para dependencias..."
+          $j = Get-Content project.json | ConvertFrom-Json
+          
+          # Crear carpeta reports
+          if (-Not (Test-Path -Path reports)) { 
+            New-Item -ItemType Directory -Path reports | Out-Null 
+          }
+          
+          # Base de datos de vulnerabilidades conocidas con detalles
+          $vulnerabilities = @{
+            "Newtonsoft.Json" = @(
+              @{ Version = "11.0.1"; CVEs = @("CVE-2019-0821", "CVE-2017-9822"); Description = "Unsafe deserialization allowing arbitrary code execution" },
+              @{ Version = "11.0.2"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" },
+              @{ Version = "12.0.0"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" },
+              @{ Version = "12.0.1"; CVEs = @("CVE-2019-0821"); Description = "Unsafe deserialization vulnerability" }
+            )
+            "System.Net.Http" = @(
+              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818", "CVE-2016-9069"); Description = "TLS downgrade attack vulnerability and HTTP header injection" },
+              @{ Version = "4.3.1"; CVEs = @("CVE-2016-3818"); Description = "TLS downgrade attack vulnerability" }
+            )
+            "System.Net.Primitives" = @(
+              @{ Version = "4.3.0"; CVEs = @("CVE-2016-3818"); Description = "TLS protocol vulnerability" }
+            )
+            "log4net" = @(
+              @{ Version = "2.0.8"; CVEs = @("CVE-2018-1285"); Description = "Deserialization of untrusted data vulnerability in log4net" }
+            )
+            "Owin" = @(
+              @{ Version = "1.0.0"; CVEs = @("CVE-2016-7412"); Description = "Cookie authentication vulnerability allowing privilege elevation" }
+            )
+          }
+          
+          $depList = @()
+          
+          if ($j.dependencies) {
+            $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
+              $prop = $_.Name
+              $version = $j.dependencies.$prop -replace '[\[\]]', ''
+              
+              $vulnerable = $false
+              $vulnDetails = @()
+              
+              if ($vulnerabilities.ContainsKey($prop)) {
+                $vulnInfo = $vulnerabilities[$prop] | Where-Object { $_.Version -eq $version }
+                if ($vulnInfo) {
+                  $vulnerable = $true
+                  $vulnDetails = $vulnInfo
+                  Write-Host "⚠️  $prop : $version (VULNERABLE)"
+                  foreach ($vuln in $vulnDetails) {
+                    Write-Host "      └─ CVEs: $($vuln.CVEs -join ', ')"
+                    Write-Host "      └─ $($vuln.Description)"
+                  }
+                }
+              }
+              
+              $depList += @{ Name = $prop; Version = $version; Vulnerable = $vulnerable; VulnDetails = $vulnDetails }
+              
+              if (-not $vulnerable) {
+                Write-Host "✓ $prop : $version"
+              }
+            }
+          } else {
+            Write-Host "Ninguna dependencia encontrada."
+          }
+          
+          # Generar HTML
+          $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          $vulnCount = ($depList | Where-Object { $_.Vulnerable }).Count
+          
+          $html = @"
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <meta charset="UTF-8">
+          <title>Reporte de Dependencias - UiPath RPA</title>
+          <style>
+          body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+          .container { background: white; padding: 20px; border-radius: 8px; }
+          h1 { border-bottom: 3px solid #0078d4; padding-bottom: 10px; }
+          .safe { color: green; font-weight: bold; }
+          .vuln { color: #d32f2f; font-weight: bold; }
+          .alert { background: #fff3cd; padding: 10px; margin: 15px 0; }
+          .footer { margin-top: 20px; font-size: 12px; color: #999; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #0078d4; color: white; padding: 10px; text-align: left; }
+          td { padding: 10px; border-bottom: 1px solid #ddd; }
+          tr.vulnerable { background: #ffebee; }
+          .cves { font-family: monospace; font-size: 12px; color: #d32f2f; }
+          .cve-desc { font-size: 12px; color: #666; margin-top: 5px; font-style: italic; }
+          </style>
+          </head>
+          <body>
+          <div class="container">
+          <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
+          <p><strong>Generado:</strong> $timestamp</p>
+          <p><strong>Total:</strong> $($depList.Count) | <span class="vuln">$vulnCount Vulnerables</span></p>
+          "@
+              
+              if ($vulnCount -gt 0) {
+                $html += "<div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) vulnerables.</div>"
+              }
+              
+              if ($depList.Count -gt 0) {
+                $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th><th>Detalles</th></tr>"
+                
+                foreach ($dep in $depList) {
+                  if ($dep.Vulnerable) {
+                    $cveList = ($dep.VulnDetails | ForEach-Object { $_.CVEs -join ", " }) -join ", "
+                    $description = ($dep.VulnDetails.Description) -join " | "
+                    $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td><td><div class='cves'>CVEs: $cveList</div><div class='cve-desc'>$description</div></td></tr>"
+                  } else {
+                    $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td><td>Sin vulnerabilidades conocidas</td></tr>"
+                  }
+                }
+                
+                $html += "</table>"
+              } else {
+                $html += "<p><em>Sin dependencias adicionales.</em></p>"
+              }
+              
+              $html += @"
+          <div class="footer">
+          <p>Generado automáticamente por CI/CD.</p>
+          </div>
+          </div>
+          </body>
+          </html>
+          "@
+              
+              $html | Out-File "reports/dependencias-report.html"
+              Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
+      
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'UiPath RPA'
+          path: '.'
+          format: 'HTML'
+          args: >
+            --enableExperimental
+            --failOnCVSS 7
+            -o ./reports
+      
+      - name: SonarCloud Scan (CLI)
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=DuvanGT_rpa-uipath
+            -Dsonar.organization=duvangt
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+      
+      - name: Publicar reporte de dependencias
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAST & SCA Report
+          path: reports/
+
+  
+  deploy:
+    needs: vulnerabilities
     runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
     
     steps:
@@ -279,7 +525,7 @@ jobs:
           Write-Host "Respuesta de UiPath: $responseBody"
 
           if ($httpCode -match '^20') {
-              Write-Host "¡BINGO! Paquete subido correctamente al Orchestrator."
+              Write-Host "Paquete subido correctamente al Orchestrator."
           } else {
               Write-Error "Error subiendo paquete. Revisa la respuesta arriba."
               exit 1
