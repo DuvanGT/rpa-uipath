@@ -158,7 +158,7 @@ jobs:
                   -Dsonar.organization=duvangt
                   -Dsonar.sources=.
                   -Dsonar.xml.file.suffixes=.xml,.xaml
-                  -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+                  -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/**.yml
                   -Dsonar.externalIssuesReportPaths=sonar-issues.json
   vulnerabilities:
     needs: build
