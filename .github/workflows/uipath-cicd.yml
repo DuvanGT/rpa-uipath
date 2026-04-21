@@ -124,6 +124,7 @@ jobs:
                   -Dsonar.projectKey=DuvanGT_rpa-uipath-v2
                   -Dsonar.organization=duvangt
                   -Dsonar.sources=.
+                  -Dsonar.xml.file.suffixes=.xml,.xaml
                   -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
                   -Dsonar.externalIssuesReportPaths=sonar-issues.json
   vulnerabilities:
