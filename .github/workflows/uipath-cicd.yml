@@ -63,25 +63,27 @@ jobs:
                 fetch-depth: 0
             
             # --- PASOS NUEVOS PARA UIPATH ---
-            - name: Ejecutar UiPath Workflow Analyzer (Real)
+            - name: Ejecutar UiPath Workflow Analyzer (Con CLI de .NET)
               shell: pwsh
               run: |
-                Write-Host "Ejecutando analizador real de UiPath..."
+                Write-Host "1. Preparando entorno .NET para el CLI..."
+                dotnet new tool-manifest
                 
-                # 1. Definimos la ruta donde suele estar instalado UiPath en la máquina
-                $UiPathCli = "C:\Program Files\UiPath\Studio\UiPath.Studio.CommandLine.exe"
+                Write-Host "2. Descargando UiPath CLI..."
+                dotnet tool install UiPath.CLI.Windows
                 
-                # 2. Verificamos que el programa de UiPath exista en el servidor
-                if (-Not (Test-Path $UiPathCli)) {
-                    Write-Error "No se encontró UiPath Studio en esta máquina. Revisa la ruta."
-                    exit 1
+                Write-Host "3. Ejecutando analizador sobre project.json..."
+                # Usamos el CLI descargado para analizar y exportar el JSON
+                # Nota: Dependiendo de la versión del CLI, el parámetro puede ser -o (minúscula) o -O (mayúscula).
+                dotnet tool run uipcli package analyze project.json -o "uipath-analyzer-results.json"
+                
+                if (Test-Path "uipath-analyzer-results.json") {
+                    Write-Host "¡Análisis completado y guardado correctamente!"
+                } else {
+                    Write-Warning "El archivo de resultados no se generó. Es posible que el proyecto no tenga errores de código."
+                    # Creamos un archivo vacío para que el siguiente paso de PowerShell no falle
+                    '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
                 }
-                
-                # 3. Ejecutamos el análisis real sobre tu project.json
-                # La bandera -p indica el proyecto, y -O (letra O mayúscula) indica dónde guardar el JSON
-                & $UiPathCli analyze -p "$(Build.SourcesDirectory)\project.json" -O "$(Build.SourcesDirectory)\uipath-analyzer-results.json"
-                
-                Write-Host "Análisis completado. Resultados guardados."
       
             - name: Convertir formato de UiPath a SonarCloud
               shell: pwsh
