@@ -117,6 +117,7 @@ jobs:
             - name: Inyectar error de prueba para SonarCloud
               shell: pwsh
               run: |
+                echo "Hola mundo"
                 $fakeIssue = @"
                 {
                   "issues": [
