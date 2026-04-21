@@ -73,15 +73,13 @@ jobs:
                 dotnet tool install UiPath.CLI.Windows
                 
                 Write-Host "3. Ejecutando analizador sobre project.json..."
-                # Usamos el CLI descargado para analizar y exportar el JSON
-                # Nota: Dependiendo de la versión del CLI, el parámetro puede ser -o (minúscula) o -O (mayúscula).
-                dotnet tool run uipcli package analyze project.json -o "uipath-analyzer-results.json"
+                # Usamos --resultPath como lo exige esta versión del CLI
+                dotnet tool run uipcli package analyze project.json --resultPath "uipath-analyzer-results.json"
                 
                 if (Test-Path "uipath-analyzer-results.json") {
                     Write-Host "¡Análisis completado y guardado correctamente!"
                 } else {
                     Write-Warning "El archivo de resultados no se generó. Es posible que el proyecto no tenga errores de código."
-                    # Creamos un archivo vacío para que el siguiente paso de PowerShell no falle
                     '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
                 }
       
