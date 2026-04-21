@@ -63,19 +63,25 @@ jobs:
                 fetch-depth: 0
             
             # --- PASOS NUEVOS PARA UIPATH ---
-            - name: Ejecutar UiPath Workflow Analyzer
+            - name: Ejecutar UiPath Workflow Analyzer (Real)
               shell: pwsh
               run: |
-                # NOTA IMPORTANTE: Para que este comando funcione de verdad, el runner de GitHub 
-                # debe tener acceso a UiPath CLI. Si usas 'windows-latest' de GitHub, no lo tiene instalado.
-                # Lo ideal es que este job corra en un Self-Hosted Runner (una máquina de tu empresa con UiPath).
+                Write-Host "Ejecutando analizador real de UiPath..."
                 
-                Write-Host "Ejecutando analizador de UiPath..."
-                # Descomenta la siguiente línea cuando tengas el uipath-cli disponible:
-                # uipath-cli analyze --projectPath "project.json" --output "uipath-analyzer-results.json"
+                # 1. Definimos la ruta donde suele estar instalado UiPath en la máquina
+                $UiPathCli = "C:\Program Files\UiPath\Studio\UiPath.Studio.CommandLine.exe"
                 
-                # [SOLO PARA PRUEBAS] Simulamos un archivo de resultados vacío para que el pipeline no falle ahora mismo
-                '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
+                # 2. Verificamos que el programa de UiPath exista en el servidor
+                if (-Not (Test-Path $UiPathCli)) {
+                    Write-Error "No se encontró UiPath Studio en esta máquina. Revisa la ruta."
+                    exit 1
+                }
+                
+                # 3. Ejecutamos el análisis real sobre tu project.json
+                # La bandera -p indica el proyecto, y -O (letra O mayúscula) indica dónde guardar el JSON
+                & $UiPathCli analyze -p "$(Build.SourcesDirectory)\project.json" -O "$(Build.SourcesDirectory)\uipath-analyzer-results.json"
+                
+                Write-Host "Análisis completado. Resultados guardados."
       
             - name: Convertir formato de UiPath a SonarCloud
               shell: pwsh
