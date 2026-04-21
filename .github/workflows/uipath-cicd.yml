@@ -113,7 +113,6 @@ jobs:
                     Write-Host "No se encontró el archivo de UiPath."
                     '{"issues": []}' | Out-File "sonar-issues.json"
                 }
-            # --------------------------------
             - name: Inyectar error de prueba para SonarCloud
               shell: pwsh
               run: |
