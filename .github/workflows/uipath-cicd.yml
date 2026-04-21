@@ -114,7 +114,27 @@ jobs:
                     '{"issues": []}' | Out-File "sonar-issues.json"
                 }
             # --------------------------------
-      
+            - name: Inyectar error de prueba para SonarCloud
+              shell: pwsh
+              run: |
+                $fakeIssue = @"
+                {
+                  "issues": [
+                    {
+                      "engineId": "UiPathAnalyzer",
+                      "ruleId": "TEST-001",
+                      "severity": "MAJOR",
+                      "type": "CODE_SMELL",
+                      "primaryLocation": {
+                        "message": "¡ÉXITO! La conexión funciona. Este es un error de prueba de UiPath.",
+                        "filePath": "Main.xaml"
+                      }
+                    }
+                  ]
+                }
+                "@
+                $fakeIssue | Out-File "sonar-issues.json" -Encoding utf8
+                Write-Host "Error falso inyectado en sonar-issues.json"
             - name: SonarCloud Scan (CLI)
               uses: SonarSource/sonarqube-scan-action@v4
               env:
