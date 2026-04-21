@@ -63,24 +63,36 @@ jobs:
                 fetch-depth: 0
             
             # --- PASOS NUEVOS PARA UIPATH ---
-            - name: Ejecutar UiPath Workflow Analyzer (Con CLI de .NET)
+            - name: Convertir formato de UiPath a SonarCloud
               shell: pwsh
               run: |
-                Write-Host "1. Preparando entorno .NET para el CLI..."
-                dotnet new tool-manifest
-                
-                Write-Host "2. Descargando UiPath CLI..."
-                dotnet tool install UiPath.CLI.Windows
-                
-                Write-Host "3. Ejecutando analizador sobre project.json..."
-                # Usamos --resultPath como lo exige esta versión del CLI
-                dotnet tool run uipcli package analyze project.json --resultPath "uipath-analyzer-results.json"
-                
                 if (Test-Path "uipath-analyzer-results.json") {
-                    Write-Host "¡Análisis completado y guardado correctamente!"
+                    $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
+                    $sonarIssues = @()
+                    
+                    if ($null -ne $uipathResults.Errors) {
+                        # CORRECCIÓN: Cambiamos $error por $hallazgo para que PowerShell no se queje
+                        foreach ($hallazgo in $uipathResults.Errors) {
+                            $issue = [PSCustomObject]@{
+                                engineId = "UiPathAnalyzer"
+                                ruleId = $hallazgo.RuleId
+                                severity = "MAJOR"
+                                type = "CODE_SMELL"
+                                primaryLocation = [PSCustomObject]@{
+                                    message = $hallazgo.Description
+                                    filePath = $hallazgo.ItemPath
+                                }
+                            }
+                            $sonarIssues += $issue
+                        }
+                    }
+                    
+                    $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
+                    $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
+                    Write-Host "Archivo sonar-issues.json generado exitosamente."
                 } else {
-                    Write-Warning "El archivo de resultados no se generó. Es posible que el proyecto no tenga errores de código."
-                    '{"Errors": []}' | Out-File "uipath-analyzer-results.json"
+                    Write-Host "No se encontró el archivo de UiPath."
+                    '{"issues": []}' | Out-File "sonar-issues.json"
                 }
       
             - name: Convertir formato de UiPath a SonarCloud
