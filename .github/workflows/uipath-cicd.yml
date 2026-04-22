@@ -129,8 +129,10 @@ jobs:
             - name: Ejecutar Pruebas Unitarias de UiPath
               shell: pwsh
               run: |
-                Write-Host "Restaurando acceso al CLI de UiPath..."
-                dotnet tool restore
+                Write-Host "Preparando CLI de UiPath en este paso..."
+                # Creamos el manifiesto forzándolo por si se perdió la ruta
+                dotnet new tool-manifest --force
+                dotnet tool install UiPath.CLI.Windows
                 
                 Write-Host "Iniciando ejecución de pruebas unitarias..."
                 # Ejecutamos el comando de pruebas
