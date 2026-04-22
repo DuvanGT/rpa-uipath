@@ -1,3 +1,4 @@
+
 name: UiPath CI/CD Pipeline
 
 on:
@@ -125,6 +126,15 @@ jobs:
                     Write-Host "No se encontró el archivo de UiPath."
                     '{"issues": []}' | Out-File "sonar-issues.json"
                 }
+            - name: Ejecutar Pruebas Unitarias de UiPath
+              shell: pwsh
+              run: |
+                Write-Host "Iniciando ejecución de pruebas unitarias..."
+                
+                # Ejecutamos el comando de pruebas del CLI
+                dotnet tool run uipcli package test project.json
+                
+                Write-Host "¡Pruebas unitarias completadas!"
             - name: Inyectar error de prueba para SonarCloud
               shell: pwsh
               run: |
