@@ -1,200 +1,162 @@
-
 name: UiPath CI/CD Pipeline
-
+ 
 on:
   workflow_dispatch:
   push:
     branches: [ develop ]
   pull_request:
     types: [opened, synchronize, reopened]
-
+ 
 permissions:
   security-events: write
   contents: read
-
+ 
 jobs:
+ 
+  # ============================================================
+  # JOB 1: BUILD - Compilar y empaquetar el robot
+  # ============================================================
   build:
-    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
-    
+    runs-on: windows-latest
     steps:
       - name: Checkout del código
         uses: actions/checkout@v3
-      
+ 
       - name: Pack Robot (Compilar Oficialmente)
         shell: powershell
         run: |
           $version = "1.0.${{ github.run_number }}.${{ github.run_attempt }}"
           $outputDir = "output"
           New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-          
+ 
           Write-Host "1. Preparando el manifiesto de herramientas .NET..."
-          # Crea un entorno local para instalar herramientas de forma segura
           dotnet new tool-manifest
-          
+ 
           Write-Host "2. Instalando UiPath CLI oficial..."
-          # Descarga la herramienta en su nuevo formato DotnetTool
           dotnet tool install UiPath.CLI.Windows
-          
-          Write-Host "3. Empaquetando el proyecto con la estructura correcta..."
-          # Usamos 'dotnet tool run' para ejecutar uipcli sin problemas de rutas
+ 
+          Write-Host "3. Empaquetando el proyecto..."
           dotnet tool run uipcli package pack project.json -o $outputDir -v $version
-          
-          Write-Host "¡Empaquetado listo! Verificando archivo:"
+ 
+          Write-Host "Empaquetado listo. Verificando archivo:"
           Get-ChildItem -Path $outputDir
-
+ 
       - name: Guardar el artefacto compilado
         uses: actions/upload-artifact@v4
         with:
           name: RobotCompilado
           path: output/
-
-  sonarcloud:
-    name: SonarCloud Scan
-    runs-on: windows-latest
-    steps:
-            - name: Set up JDK 17
-              uses: actions/setup-java@v4
-              with:
-                java-version: 17
-                distribution: 'zulu'
-            
-            - name: Checkout del código
-              uses: actions/checkout@v4
-              with:
-                fetch-depth: 0
-            
-            # --- PASOS NUEVOS PARA UIPATH ---
-            - name: Convertir formato de UiPath a SonarCloud
-              shell: pwsh
-              run: |
-                if (Test-Path "uipath-analyzer-results.json") {
-                    $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
-                    $sonarIssues = @()
-                    
-                    if ($null -ne $uipathResults.Errors) {
-                        # CORRECCIÓN: Cambiamos $error por $hallazgo para que PowerShell no se queje
-                        foreach ($hallazgo in $uipathResults.Errors) {
-                            $issue = [PSCustomObject]@{
-                                engineId = "UiPathAnalyzer"
-                                ruleId = $hallazgo.RuleId
-                                severity = "MAJOR"
-                                type = "CODE_SMELL"
-                                primaryLocation = [PSCustomObject]@{
-                                    message = $hallazgo.Description
-                                    filePath = $hallazgo.ItemPath
-                                }
-                            }
-                            $sonarIssues += $issue
-                        }
-                    }
-                    
-                    $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
-                    $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
-                    Write-Host "Archivo sonar-issues.json generado exitosamente."
-                } else {
-                    Write-Host "No se encontró el archivo de UiPath."
-                    '{"issues": []}' | Out-File "sonar-issues.json"
-                }
-      
-            - name: Convertir formato de UiPath a SonarCloud
-              shell: pwsh
-              run: |
-                if (Test-Path "uipath-analyzer-results.json") {
-                    $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
-                    $sonarIssues = @()
-                    
-                    if ($null -ne $uipathResults.Errors) {
-                        foreach ($error in $uipathResults.Errors) {
-                            $issue = [PSCustomObject]@{
-                                engineId = "UiPathAnalyzer"
-                                ruleId = $error.RuleId
-                                severity = "MAJOR"
-                                type = "CODE_SMELL"
-                                primaryLocation = [PSCustomObject]@{
-                                    message = $error.Description
-                                    filePath = $error.ItemPath
-                                }
-                            }
-                            $sonarIssues += $issue
-                        }
-                    }
-                    
-                    $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
-                    $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
-                    Write-Host "Archivo sonar-issues.json generado exitosamente."
-                } else {
-                    Write-Host "No se encontró el archivo de UiPath."
-                    '{"issues": []}' | Out-File "sonar-issues.json"
-                }
-            - name: Ejecutar Pruebas Unitarias de UiPath
-              shell: pwsh
-              run: |
-                Write-Host "Preparando CLI de UiPath en este paso..."
-                # Creamos el manifiesto forzándolo por si se perdió la ruta
-                dotnet new tool-manifest --force
-                dotnet tool install UiPath.CLI.Windows
-                
-                Write-Host "Iniciando ejecución de pruebas unitarias..."
-                # Ejecutamos el comando de pruebas
-                dotnet tool run uipcli package test project.json
-                
-                Write-Host "¡Pruebas unitarias completadas!"
-            - name: Inyectar error de prueba para SonarCloud
-              shell: pwsh
-              run: |
-                echo "Hola mundo"
-                $fakeIssue = @"
-                {
-                  "issues": [
-                    {
-                      "engineId": "UiPathAnalyzer",
-                      "ruleId": "TEST-001",
-                      "severity": "MAJOR",
-                      "type": "CODE_SMELL",
-                      "primaryLocation": {
-                        "message": "¡ÉXITO! La conexión funciona. Este es un error de prueba de UiPath.",
-                        "filePath": "Main.xaml"
-                      }
-                    }
-                  ]
-                }
-                "@
-                $fakeIssue | Out-File "sonar-issues.json" -Encoding utf8
-                Write-Host "Error falso inyectado en sonar-issues.json"
-
-            - name: SonarCloud Scan (CLI)
-              uses: SonarSource/sonarqube-scan-action@v4
-              env:
-                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-              with:
-                args: >
-                  -Dsonar.projectKey=DuvanGT_rpa-uipath-v2
-                  -Dsonar.organization=duvangt
-                  -Dsonar.sources=.
-                  -Dsonar.xml.file.suffixes=.xml,.xaml
-                  -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/**.yml
-                  -Dsonar.externalIssuesReportPaths=sonar-issues.json
-  vulnerabilities:
+ 
+  # ============================================================
+  # JOB 2: TEST - Ejecutar pruebas unitarias (bloquea el deploy)
+  # ============================================================
+  test:
     needs: build
-    runs-on: ubuntu-latest # Importante: UiPath requiere Windows para compilar
+    runs-on: windows-latest
     steps:
       - name: Checkout del código
         uses: actions/checkout@v3
+ 
+      - name: Ejecutar Pruebas Unitarias de UiPath
+        shell: pwsh
+        run: |
+          Write-Host "Preparando CLI de UiPath..."
+          dotnet new tool-manifest --force
+          dotnet tool install UiPath.CLI.Windows
+ 
+          Write-Host "Iniciando ejecución de pruebas unitarias..."
+          dotnet tool run uipcli package test project.json
+ 
+          Write-Host "Pruebas unitarias completadas exitosamente."
+ 
+  # ============================================================
+  # JOB 3: SONARCLOUD - Análisis de calidad de código
+  # ============================================================
+  sonarcloud:
+    needs: build
+    name: SonarCloud Scan
+    runs-on: windows-latest
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+ 
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+ 
+      - name: Convertir formato de UiPath a SonarCloud
+        shell: pwsh
+        run: |
+          if (Test-Path "uipath-analyzer-results.json") {
+              $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
+              $sonarIssues = @()
+ 
+              if ($null -ne $uipathResults.Errors) {
+                  # Usamos $hallazgo para evitar conflicto con la variable $error de PowerShell
+                  foreach ($hallazgo in $uipathResults.Errors) {
+                      $issue = [PSCustomObject]@{
+                          engineId = "UiPathAnalyzer"
+                          ruleId = $hallazgo.RuleId
+                          severity = "MAJOR"
+                          type = "CODE_SMELL"
+                          primaryLocation = [PSCustomObject]@{
+                              message = $hallazgo.Description
+                              filePath = $hallazgo.ItemPath
+                          }
+                      }
+                      $sonarIssues += $issue
+                  }
+              }
+ 
+              $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
+              $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json"
+              Write-Host "Archivo sonar-issues.json generado exitosamente."
+          } else {
+              Write-Host "No se encontró el archivo de UiPath. Generando reporte vacío."
+              '{"issues": []}' | Out-File "sonar-issues.json"
+          }
+ 
+      - name: SonarCloud Scan (CLI)
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=DuvanGT_rpa-uipath-v2
+            -Dsonar.organization=duvangt
+            -Dsonar.sources=.
+            -Dsonar.xml.file.suffixes=.xml,.xaml
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/**.yml
+            -Dsonar.externalIssuesReportPaths=sonar-issues.json
+ 
+  # ============================================================
+  # JOB 4: VULNERABILITIES - Análisis de dependencias y seguridad
+  # ============================================================
+  vulnerabilities:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+ 
       - name: Analizar dependencias del proyecto
         shell: pwsh
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
-
+ 
           Write-Host "Leyendo project.json para dependencias..."
           $j = Get-Content project.json | ConvertFrom-Json
-          
-          # Crear carpeta reports
-          if (-Not (Test-Path -Path reports)) { 
-            New-Item -ItemType Directory -Path reports | Out-Null 
+ 
+          if (-Not (Test-Path -Path reports)) {
+            New-Item -ItemType Directory -Path reports | Out-Null
           }
-          
-          # Base de datos de vulnerabilidades conocidas con detalles
+ 
+          # Base de datos de vulnerabilidades conocidas
           $vulnerabilities = @{
             "Newtonsoft.Json" = @(
               @{ Version = "11.0.1"; CVEs = @("CVE-2019-0821", "CVE-2017-9822"); Description = "Unsafe deserialization allowing arbitrary code execution" },
@@ -216,44 +178,44 @@ jobs:
               @{ Version = "1.0.0"; CVEs = @("CVE-2016-7412"); Description = "Cookie authentication vulnerability allowing privilege elevation" }
             )
           }
-          
+ 
           $depList = @()
-          
+ 
           if ($j.dependencies) {
             $j.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object {
               $prop = $_.Name
               $version = $j.dependencies.$prop -replace '[\[\]]', ''
-              
+ 
               $vulnerable = $false
               $vulnDetails = @()
-              
+ 
               if ($vulnerabilities.ContainsKey($prop)) {
                 $vulnInfo = $vulnerabilities[$prop] | Where-Object { $_.Version -eq $version }
                 if ($vulnInfo) {
                   $vulnerable = $true
                   $vulnDetails = $vulnInfo
-                  Write-Host "⚠️  $prop : $version (VULNERABLE)"
+                  Write-Host "VULNERABLE: $prop : $version"
                   foreach ($vuln in $vulnDetails) {
-                    Write-Host "      └─ CVEs: $($vuln.CVEs -join ', ')"
-                    Write-Host "      └─ $($vuln.Description)"
+                    Write-Host "   CVEs: $($vuln.CVEs -join ', ')"
+                    Write-Host "   $($vuln.Description)"
                   }
                 }
               }
-              
+ 
               $depList += @{ Name = $prop; Version = $version; Vulnerable = $vulnerable; VulnDetails = $vulnDetails }
-              
+ 
               if (-not $vulnerable) {
-                Write-Host "✓ $prop : $version"
+                Write-Host "OK: $prop : $version"
               }
             }
           } else {
             Write-Host "Ninguna dependencia encontrada."
           }
-          
-          # Generar HTML
+ 
+          # Generar reporte HTML
           $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
           $vulnCount = ($depList | Where-Object { $_.Vulnerable }).Count
-          
+ 
           $html = @"
           <!DOCTYPE html>
           <html>
@@ -278,45 +240,41 @@ jobs:
           </head>
           <body>
           <div class="container">
-          <h1>📦 Reporte de Dependencias - UiPath RPA</h1>
+          <h1>Reporte de Dependencias - UiPath RPA</h1>
           <p><strong>Generado:</strong> $timestamp</p>
           <p><strong>Total:</strong> $($depList.Count) | <span class="vuln">$vulnCount Vulnerables</span></p>
           "@
-              
-              if ($vulnCount -gt 0) {
-                $html += "<div class='alert'><strong>⚠️ Advertencia:</strong> Se encontraron $vulnCount paquete(s) vulnerables.</div>"
-              }
-              
-              if ($depList.Count -gt 0) {
-                $html += "<table><tr><th>Paquete</th><th>Versión</th><th>Estado</th><th>Detalles</th></tr>"
-                
-                foreach ($dep in $depList) {
-                  if ($dep.Vulnerable) {
-                    $cveList = ($dep.VulnDetails | ForEach-Object { $_.CVEs -join ", " }) -join ", "
-                    $description = ($dep.VulnDetails.Description) -join " | "
-                    $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>⚠️ VULNERABLE</span></td><td><div class='cves'>CVEs: $cveList</div><div class='cve-desc'>$description</div></td></tr>"
-                  } else {
-                    $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>✓ Seguro</span></td><td>Sin vulnerabilidades conocidas</td></tr>"
-                  }
-                }
-                
-                $html += "</table>"
+ 
+          if ($vulnCount -gt 0) {
+            $html += "<div class='alert'><strong>Advertencia:</strong> Se encontraron $vulnCount paquete(s) vulnerables.</div>"
+          }
+ 
+          if ($depList.Count -gt 0) {
+            $html += "<table><tr><th>Paquete</th><th>Version</th><th>Estado</th><th>Detalles</th></tr>"
+ 
+            foreach ($dep in $depList) {
+              if ($dep.Vulnerable) {
+                $cveList = ($dep.VulnDetails | ForEach-Object { $_.CVEs -join ", " }) -join ", "
+                $description = ($dep.VulnDetails.Description) -join " | "
+                $html += "<tr class='vulnerable'><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='vuln'>VULNERABLE</span></td><td><div class='cves'>CVEs: $cveList</div><div class='cve-desc'>$description</div></td></tr>"
               } else {
-                $html += "<p><em>Sin dependencias adicionales.</em></p>"
+                $html += "<tr><td>$($dep.Name)</td><td>$($dep.Version)</td><td><span class='safe'>Seguro</span></td><td>Sin vulnerabilidades conocidas</td></tr>"
               }
-              
-              $html += @"
-          <div class="footer">
-          <p>Generado automáticamente por CI/CD.</p>
-          </div>
-          </div>
-          </body>
-          </html>
+            }
+ 
+            $html += "</table>"
+          } else {
+            $html += "<p><em>Sin dependencias adicionales.</em></p>"
+          }
+ 
+          $html += @"
+          <div class="footer"><p>Generado automaticamente por CI/CD.</p></div>
+          </div></body></html>
           "@
-              
-              $html | Out-File "reports/dependencias-report.html"
-              Write-Host "`n✅ Reporte HTML guardado en: reports/dependencias-report.html"
-      
+ 
+          $html | Out-File "reports/dependencias-report.html"
+          Write-Host "Reporte HTML guardado en: reports/dependencias-report.html"
+ 
       - name: OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -327,7 +285,7 @@ jobs:
             --enableExperimental
             --failOnCVSS 7
             -o ./reports
-      
+ 
       - name: SonarCloud Scan (CLI)
         uses: SonarSource/sonarqube-scan-action@v4
         env:
@@ -338,28 +296,29 @@ jobs:
             -Dsonar.organization=duvangt
             -Dsonar.sources=.
             -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/**.yaml
-      
+ 
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
         with:
           name: SAST & SCA Report
           path: reports/
-
-  
+ 
+  # ============================================================
+  # JOB 5: DEPLOY - Solo si test, sonarcloud y vulnerabilities pasan
+  # ============================================================
   deploy:
-    needs: vulnerabilities
-    runs-on: windows-latest # Importante: UiPath requiere Windows para compilar
-    
+    needs: [test, sonarcloud, vulnerabilities]  # Bloquea si cualquiera falla
+    runs-on: windows-latest
     steps:
       - name: Checkout del código
         uses: actions/checkout@v3
-      
+ 
       - name: Descargar artefacto compilado
         uses: actions/download-artifact@v4
         with:
           name: RobotCompilado
           path: output/
-      
+ 
       - name: Desplegar paquete al Orchestrator (Automation Cloud)
         shell: pwsh
         env:
@@ -371,62 +330,67 @@ jobs:
           Write-Host "Buscando .nupkg en output/"
           $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
           if (-not $pkg) {
-            Write-Error "No se encontró ningún .nupkg en output/"
+            Write-Error "No se encontro ningun .nupkg en output/"
             exit 1
           }
           Write-Host "Encontrado paquete: $($pkg.Name)"
-
+ 
           $account = $env:UIPATH_ACCOUNT_LOGICAL_NAME
-          $tenant = $env:UIPATH_TENANT_NAME
+          $tenant  = $env:UIPATH_TENANT_NAME
           $clientId = $env:UIPATH_CLIENT_ID
           $clientSecret = $env:UIPATH_CLIENT_SECRET
+ 
           if (-not ($account -and $tenant -and $clientId -and $clientSecret)) {
-            Write-Error "Faltan secretos necesarios. Añade UIPATH_ACCOUNT_LOGICAL_NAME, UIPATH_TENANT_NAME, UIPATH_CLIENT_ID, UIPATH_CLIENT_SECRET"
+            Write-Error "Faltan secretos. Verifica: UIPATH, APP_ID, APP_SECRET en GitHub Secrets."
             exit 1
           }
-
+ 
           Write-Host "Autenticando en Identity API de UiPath..."
           $tokenEndpoint = 'https://cloud.uipath.com/identity_/connect/token'
           $body = @{
-            grant_type = 'client_credentials'
-            client_id = $clientId
+            grant_type    = 'client_credentials'
+            client_id     = $clientId
             client_secret = $clientSecret
-            scope = 'OR.Execution OR.Folders'
+            scope         = 'OR.Execution OR.Folders'
           }
+ 
           try {
             $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
           } catch {
-            Write-Error "Error authenticating: $_"
+            Write-Error "Error autenticando: $_"
             exit 1
           }
+ 
           $accessToken = $resp.access_token
-          if (-not $accessToken) { Write-Error "No se obtuvo access_token desde Identity API"; exit 1 }
-
+          if (-not $accessToken) {
+            Write-Error "No se obtuvo access_token desde Identity API"
+            exit 1
+          }
+ 
           $orchUploadUrl = "https://cloud.uipath.com/$account/$tenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.UploadPackage"
           Write-Host "Subiendo paquete a: $orchUploadUrl"
-
+ 
           $filePath = $pkg.FullName
           $fileSize = (Get-Item $filePath).Length
-          Write-Host "Tamaño del archivo a subir: $fileSize bytes"
-          
-          # Validación de seguridad para evitar el error 1654 por archivo vacío
+          Write-Host "Tamano del archivo: $fileSize bytes"
+ 
           if ($fileSize -eq 0) {
-              Write-Error "¡Alto ahí! El archivo .nupkg está vacío (0 bytes). Revisa el paso de tu pipeline donde descargas el artefacto."
-              exit 1
+            Write-Error "El archivo .nupkg esta vacio (0 bytes). Revisa el paso de compilacion."
+            exit 1
           }
-
-          Write-Host "Ejecutando subida con curl.exe para formateo perfecto..."
-          # Usamos curl.exe nativo que jamás falla con el formato multipart
-          $httpCode = curl.exe -s -w "%{http_code}" -o result.json -X POST "$orchUploadUrl" -H "Authorization: Bearer $accessToken" -F "file=@$filePath"
-          
+ 
+          Write-Host "Subiendo con curl.exe..."
+          $httpCode = curl.exe -s -w "%{http_code}" -o result.json -X POST "$orchUploadUrl" `
+            -H "Authorization: Bearer $accessToken" `
+            -F "file=@$filePath"
+ 
           $responseBody = Get-Content result.json -Raw
-          Write-Host "Código HTTP devuelto: $httpCode"
-          Write-Host "Respuesta de UiPath: $responseBody"
-
+          Write-Host "Codigo HTTP: $httpCode"
+          Write-Host "Respuesta: $responseBody"
+ 
           if ($httpCode -match '^20') {
-              Write-Host "Paquete subido correctamente al Orchestrator."
+            Write-Host "Paquete desplegado correctamente en el Orchestrator."
           } else {
-              Write-Error "Error subiendo paquete. Revisa la respuesta arriba."
-              exit 1
+            Write-Error "Error al subir el paquete. Revisa la respuesta arriba."
+            exit 1
           }
-
