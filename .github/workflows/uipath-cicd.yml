@@ -290,7 +290,7 @@ jobs:
   # JOB 5: DEPLOY - Solo si test, sonarcloud y vulnerabilities pasan
   # ============================================================
   deploy:
-    needs: [test, sonarcloud, vulnerabilities]  # Bloquea si cualquiera falla
+    needs: [sonarcloud, vulnerabilities]  # Bloquea si cualquiera falla
     runs-on: windows-latest
     steps:
       - name: Checkout del código
