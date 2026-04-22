@@ -63,11 +63,18 @@ jobs:
           Write-Host "Preparando CLI de UiPath..."
           dotnet new tool-manifest --force
           dotnet tool install UiPath.CLI.Windows
- 
+      
           Write-Host "Iniciando ejecución de pruebas unitarias..."
-          dotnet tool run uipcli package test project.json
- 
-          Write-Host "Pruebas unitarias completadas exitosamente."
+          dotnet tool run uipcli test run `
+            --project-path project.json `
+            --orchestrator-url "https://cloud.uipath.com" `
+            --orchestrator-tenant "${{ secrets.UIPATH_TENANT }}" `
+            --orchestrator-accountName "${{ secrets.UIPATH }}" `
+            --orchestrator-clientId "${{ secrets.APP_ID }}" `
+            --orchestrator-clientSecret "${{ secrets.APP_SECRET }}" `
+            --out junit
+      
+          Write-Host "Pruebas unitarias completadas."
  
   # ============================================================
   # JOB 3: SONARCLOUD - Análisis de calidad de código
