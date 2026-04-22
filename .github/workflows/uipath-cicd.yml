@@ -76,7 +76,13 @@ jobs:
             --result_path test-results.xml `
             --traceLevel Information
       
-          Write-Host "Pruebas unitarias completadas."
+          # Verificar explícitamente el resultado
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Las pruebas unitarias fallaron. Bloqueando el deploy."
+            exit 1
+          }
+      
+          Write-Host "Pruebas unitarias completadas exitosamente."
  
   # ============================================================
   # JOB 3: SONARCLOUD - Análisis de calidad de código
