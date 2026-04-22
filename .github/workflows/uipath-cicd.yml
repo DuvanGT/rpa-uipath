@@ -129,9 +129,11 @@ jobs:
             - name: Ejecutar Pruebas Unitarias de UiPath
               shell: pwsh
               run: |
-                Write-Host "Iniciando ejecución de pruebas unitarias..."
+                Write-Host "Restaurando acceso al CLI de UiPath..."
+                dotnet tool restore
                 
-                # Ejecutamos el comando de pruebas del CLI
+                Write-Host "Iniciando ejecución de pruebas unitarias..."
+                # Ejecutamos el comando de pruebas
                 dotnet tool run uipcli package test project.json
                 
                 Write-Host "¡Pruebas unitarias completadas!"
