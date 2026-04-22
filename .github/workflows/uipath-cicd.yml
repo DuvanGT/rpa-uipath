@@ -50,7 +50,33 @@ jobs:
   # ============================================================
   # JOB 2: TEST - Ejecutar pruebas unitarias (bloquea el deploy)
   # ============================================================
-
+  test:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+ 
+      - name: Ejecutar Pruebas Unitarias de UiPath
+        shell: pwsh
+        run: |
+          Write-Host "Preparando CLI de UiPath..."
+          dotnet new tool-manifest --force
+          dotnet tool install UiPath.CLI.Windows
+      
+          Write-Host "Iniciando ejecución de pruebas unitarias..."
+          dotnet tool run uipcli test run "https://cloud.uipath.com/" "${{ secrets.UIPATH_TENANT }}" `
+            -A "${{ secrets.UIPATH }}" `
+            -I "${{ secrets.APP_ID }}" `
+            -S "${{ secrets.APP_SECRET }}" `
+            --applicationScope "OR.Folders OR.BackgroundTasks OR.TestSets OR.TestSetExecutions OR.TestSetSchedules OR.Settings.Read OR.Robots.Read OR.Machines.Read OR.Execution OR.Assets OR.Users.Read OR.Jobs OR.Monitoring" `
+            -o "Shared" `
+            -P project.json `
+            --out junit `
+            --result_path test-results.xml `
+            --traceLevel Information
+      
+          Write-Host "Pruebas unitarias completadas."
  
   # ============================================================
   # JOB 3: SONARCLOUD - Análisis de calidad de código
@@ -290,7 +316,7 @@ jobs:
   # JOB 5: DEPLOY - Solo si test, sonarcloud y vulnerabilities pasan
   # ============================================================
   deploy:
-    needs: [sonarcloud, vulnerabilities]  # Bloquea si cualquiera falla
+    needs: [test, sonarcloud, vulnerabilities]  # Bloquea si cualquiera falla
     runs-on: windows-latest
     steps:
       - name: Checkout del código
