@@ -16,7 +16,8 @@ jobs:
           $version = "1.0.${{ github.run_number }}"
           dotnet new tool-manifest --force
           dotnet tool install UiPath.CLI.Windows
-          dotnet tool run uipcli package pack project.json -o output -v $version
+          # Habilitamos el empaquetado con fuentes para que el análisis sea profundo
+          dotnet tool run uipcli package pack project.json -o output -v $version --include-sources True
       - uses: actions/upload-artifact@v4
         with:
           name: RobotCompilado
@@ -35,7 +36,7 @@ jobs:
           $resultsDir = "test-results"
           if (-Not (Test-Path $resultsDir)) { New-Item -ItemType Directory -Path $resultsDir }
 
-          # Se eliminó --output-type Coverage por incompatibilidad con uipcli windows
+          # EJECUCIÓN CLAVE: Agregamos --out uipath para generar el JSON detallado que Sonar prefiere
           dotnet tool run uipcli test run "https://cloud.uipath.com/" "${{ secrets.UIPATH_TENANT }}" `
             -A "${{ secrets.UIPATH }}" `
             -I "${{ secrets.APP_ID }}" `
@@ -43,8 +44,8 @@ jobs:
             --applicationScope "OR.Folders OR.BackgroundTasks OR.TestSets OR.TestSetExecutions OR.TestSetSchedules OR.Settings.Read OR.Robots.Read OR.Machines.Read OR.Execution OR.Assets OR.Users.Read OR.Jobs OR.Monitoring" `
             -o "Shared" `
             -P project.json `
-            --out junit `
-            --result_path "$resultsDir/results.xml" `
+            --out uipath `
+            --result_path "$resultsDir/results.json" `
             --traceLevel Information
       - uses: actions/upload-artifact@v4
         if: always()
@@ -77,6 +78,8 @@ jobs:
             -Dsonar.organization=duvangt
             -Dsonar.sources=.
             -Dsonar.xml.file.suffixes=.xml,.xaml
+            -Dsonar.testExecutionReportPaths=test-results/results.json
+            -Dsonar.lang.patterns.xml=**/*.xaml
 
   vulnerabilities:
     needs: build
