@@ -27,7 +27,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Tests, Coverage & Code Smells
+      - name: Run Tests & Extract All Rules
         shell: pwsh
         run: |
           dotnet new tool-manifest --force
@@ -59,7 +59,7 @@ jobs:
           "@
           $report | Out-File "$resultsDir/sonar-coverage.xml" -Encoding utf8
 
-          # 3. EL PUENTE: EXTRAER REGLAS DE UIPATH A SONARCLOUD
+          # 3. EL PUENTE: EXTRAER 3 REGLAS DE UIPATH A SONARCLOUD
           $issues = @()
           $files = Get-ChildItem -Recurse -Filter *.xaml
           
@@ -67,27 +67,56 @@ jobs:
               $content = Get-Content $file.FullName
               $lineNumber = 1
               foreach ($line in $content) {
-                  # Detectar uso de Delay estático (Mala práctica)
+                  
+                  # === MAINTAINABILITY (CODE SMELL) ===
                   if ($line -match "<Delay") {
                       $issues += @{
                           engineId = "UiPath-Workflow-Analyzer"
-                          ruleId = "ST-USG-014"
+                          ruleId = "RPA-MAINTAIN-01"
                           severity = "MAJOR"
                           type = "CODE_SMELL"
                           primaryLocation = @{
-                              message = "Mala práctica RPA: Delay estático detectado. Se recomienda usar Check App State o Element Exists."
+                              message = "Mantenibilidad: Delay estático detectado. Usar Element Exists."
                               filePath = $file.Name
-                              textRange = @{
-                                  startLine = $lineNumber
-                              }
+                              textRange = @{ startLine = $lineNumber }
                           }
                       }
                   }
+                  
+                  # === SECURITY (VULNERABILITY) ===
+                  if ($line -match "http://") {
+                      $issues += @{
+                          engineId = "UiPath-Workflow-Analyzer"
+                          ruleId = "RPA-SEC-01"
+                          severity = "CRITICAL"
+                          type = "VULNERABILITY"
+                          primaryLocation = @{
+                              message = "Seguridad: Protocolo HTTP sin encriptar detectado. Use HTTPS."
+                              filePath = $file.Name
+                              textRange = @{ startLine = $lineNumber }
+                          }
+                      }
+                  }
+
+                  # === RELIABILITY (BUG) ===
+                  if ($line -match 'ContinueOnError="True"') {
+                      $issues += @{
+                          engineId = "UiPath-Workflow-Analyzer"
+                          ruleId = "RPA-BUG-01"
+                          severity = "BLOCKER"
+                          type = "BUG"
+                          primaryLocation = @{
+                              message = "Confiabilidad (Bug): Propiedad ContinueOnError activada. Esto enmascara fallos graves en el robot."
+                              filePath = $file.Name
+                              textRange = @{ startLine = $lineNumber }
+                          }
+                      }
+                  }
+
                   $lineNumber++
               }
           }
           
-          # Guardar el JSON en formato SonarCloud
           $sonarIssues = @{ issues = $issues }
           $sonarIssues | ConvertTo-Json -Depth 5 | Out-File "$resultsDir/sonar-issues.json" -Encoding utf8
 
@@ -126,6 +155,7 @@ jobs:
             -Dsonar.coverageReportPaths=test-results/sonar-coverage.xml
             -Dsonar.externalIssuesReportPaths=test-results/sonar-issues.json
             -Dsonar.lang.patterns.xml=**/*.xml,**/*.xaml
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/*.yml
 
   deploy:
     needs: [test, sonarcloud]
