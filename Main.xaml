@@ -6,7 +6,41 @@
   <VisualBasic.Settings>
     <x:Null />
   </VisualBasic.Settings>
-  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="496,193">
+  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="496,550">
+    
+    <Sequence.Variables>
+      <Variable x:TypeArguments="x:String" Name="db_password" />
+      <Variable x:TypeArguments="x:String" Name="AwsAccessToken" />
+      <Variable x:TypeArguments="x:String" Name="ApiEndpoint" />
+    </Sequence.Variables>
+
+    <Assign DisplayName="Inyectar Password (Peligro)" sap:VirtualizedContainerService.HintSize="434,105">
+      <Assign.To>
+        <OutArgument x:TypeArguments="x:String">[db_password]</OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="x:String">["SuperSecretPassword123!"]</InArgument>
+      </Assign.Value>
+    </Assign>
+
+    <Assign DisplayName="Inyectar Token AWS (Peligro)" sap:VirtualizedContainerService.HintSize="434,105">
+      <Assign.To>
+        <OutArgument x:TypeArguments="x:String">[AwsAccessToken]</OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="x:String">["AKIAIOSFODNN7EXAMPLE"]</InArgument>
+      </Assign.Value>
+    </Assign>
+
+    <Assign DisplayName="Inyectar URL Insegura (Peligro)" sap:VirtualizedContainerService.HintSize="434,105">
+      <Assign.To>
+        <OutArgument x:TypeArguments="x:String">[ApiEndpoint]</OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="x:String">["http://api.miproyecto.com/v1/usuarios"]</InArgument>
+      </Assign.Value>
+    </Assign>
+
     <Assign DisplayName="Asignar Saludo" sap:VirtualizedContainerService.HintSize="434,105">
       <Assign.To>
         <OutArgument x:TypeArguments="x:String">[out_SaludoFinal]</OutArgument>
