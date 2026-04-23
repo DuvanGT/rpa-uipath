@@ -79,6 +79,8 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.xml.file.suffixes=.xml,.xaml
             -Dsonar.junit.reportPaths=test-results/results.xml
+            -Dsonar.python.version=3
+            -Dsonar.lang.patterns.xml=**/*.xml,**/*.xaml
 
   deploy:
     needs: [test, sonarcloud]
