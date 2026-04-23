@@ -268,6 +268,22 @@ jobs:
         with:
           name: TestResults
           path: test-results/
+          
+      - name: Inyectar Vulnerabilidad de Prueba
+        shell: pwsh
+        run: |
+          $codigoInseguro = @"
+          {
+            "ConfiguracionBaseDatos": {
+              "Usuario": "admin",
+              "Password": "SuperSecretPassword123!",
+              "TokenAWS": "AKIAIOSFODNN7EXAMPLE",
+              "ConexionAPI": "http://192.168.1.150/api/datos"
+            }
+          }
+          "@
+          # Guardamos esto como un archivo que SonarCloud va a analizar
+          $codigoInseguro | Out-File "config_insegura.json" -Encoding utf8
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v4
