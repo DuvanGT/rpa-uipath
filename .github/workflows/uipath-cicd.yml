@@ -16,8 +16,8 @@ jobs:
           $version = "1.0.${{ github.run_number }}"
           dotnet new tool-manifest --force
           dotnet tool install UiPath.CLI.Windows
-          # Habilitamos el empaquetado con fuentes para que el análisis sea profundo
-          dotnet tool run uipcli package pack project.json -o output -v $version --include-sources True
+          # CORRECCIÓN: Usamos --outputType Tests y eliminamos --include-sources si da error
+          dotnet tool run uipcli package pack project.json -o output -v $version --outputType Tests
       - uses: actions/upload-artifact@v4
         with:
           name: RobotCompilado
@@ -36,7 +36,7 @@ jobs:
           $resultsDir = "test-results"
           if (-Not (Test-Path $resultsDir)) { New-Item -ItemType Directory -Path $resultsDir }
 
-          # EJECUCIÓN CLAVE: Agregamos --out uipath para generar el JSON detallado que Sonar prefiere
+          # Aquí usamos --out uipath para generar el reporte que Sonar prefiere
           dotnet tool run uipcli test run "https://cloud.uipath.com/" "${{ secrets.UIPATH_TENANT }}" `
             -A "${{ secrets.UIPATH }}" `
             -I "${{ secrets.APP_ID }}" `
@@ -79,17 +79,9 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.xml.file.suffixes=.xml,.xaml
             -Dsonar.testExecutionReportPaths=test-results/results.json
-            -Dsonar.lang.patterns.xml=**/*.xaml
-
-  vulnerabilities:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "Análisis de seguridad" > report.txt
 
   deploy:
-    needs: [test, sonarcloud, vulnerabilities]
+    needs: [test, sonarcloud]
     runs-on: windows-latest
     steps:
       - uses: actions/download-artifact@v4
