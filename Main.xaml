@@ -6,30 +6,9 @@
   <VisualBasic.Settings>
     <x:Null />
   </VisualBasic.Settings>
-  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="496,650">
+  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="496,350">
     
-    <Sequence.Variables>
-      <Variable x:TypeArguments="x:String" Name="db_password" />
-      <Variable x:TypeArguments="x:String" Name="AwsAccessToken" />
-    </Sequence.Variables>
-
-    <Assign DisplayName="Inyectar Password (Peligro)" sap:VirtualizedContainerService.HintSize="434,105">
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[db_password]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">["P@ssw0rd_Admin_2026!"]</InArgument>
-      </Assign.Value>
-    </Assign>
-
-    <Assign DisplayName="Inyectar Token AWS (Peligro)" sap:VirtualizedContainerService.HintSize="434,105">
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[AwsAccessToken]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">["AKIA1234567890ABCDEF"]</InArgument>
-      </Assign.Value>
-    </Assign>
+    <Delay Duration="00:00:05" DisplayName="Delay Inseguro" sap:VirtualizedContainerService.HintSize="434,90" />
 
     <Assign DisplayName="Asignar Saludo" sap:VirtualizedContainerService.HintSize="434,105">
       <Assign.To>
