@@ -281,6 +281,7 @@ jobs:
             -Dsonar.xml.file.suffixes=.xml,.xaml
             -Dsonar.junit.reportPaths=test-results/results.xml
             -Dsonar.coverageReportPaths=test-results/sonar-coverage.xml
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/*.yml
             -Dsonar.lang.patterns.xml=**/*.xml,**/*.xaml
 
   # ============================================================
