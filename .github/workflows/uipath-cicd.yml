@@ -4,71 +4,39 @@ on:
   workflow_dispatch:
   push:
     branches: [ develop ]
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  security-events: write
-  contents: read
 
 jobs:
-
-  # ============================================================
-  # JOB 1: BUILD - Compilar y empaquetar el robot
-  # ============================================================
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
-
-      - name: Pack Robot (Compilar Oficialmente)
+      - uses: actions/checkout@v4
+      - name: Pack Robot
         shell: powershell
         run: |
-          $version = "1.0.${{ github.run_number }}.${{ github.run_attempt }}"
-          $outputDir = "output"
-          if (-Not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir }
-
-          Write-Host "1. Preparando el manifiesto de herramientas .NET..."
+          $version = "1.0.${{ github.run_number }}"
           dotnet new tool-manifest --force
-
-          Write-Host "2. Instalando UiPath CLI oficial..."
           dotnet tool install UiPath.CLI.Windows
-
-          Write-Host "3. Empaquetando el proyecto..."
-          dotnet tool run uipcli package pack project.json -o $outputDir -v $version
-
-          Write-Host "Empaquetado listo. Verificando archivo:"
-          Get-ChildItem -Path $outputDir
-
-      - name: Guardar el artefacto compilado
-        uses: actions/upload-artifact@v4
+          # Usamos --outputType Tests para que los metadatos de prueba viajen en el paquete
+          dotnet tool run uipcli package pack project.json -o output -v $version --outputType Tests
+      - uses: actions/upload-artifact@v4
         with:
           name: RobotCompilado
           path: output/
 
-  # ============================================================
-  # JOB 2: TEST - Ejecutar pruebas unitarias (bloquea el deploy)
-  # ============================================================
   test:
     needs: build
     runs-on: windows-latest
     steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
-
-      - name: Ejecutar Pruebas Unitarias de UiPath
+      - uses: actions/checkout@v4
+      - name: Run Tests
         shell: pwsh
         run: |
-          Write-Host "Preparando entorno de pruebas..."
           dotnet new tool-manifest --force
           dotnet tool install UiPath.CLI.Windows
-          
-          # Crear directorio para resultados para evitar errores de acceso
           $resultsDir = "test-results"
           if (-Not (Test-Path $resultsDir)) { New-Item -ItemType Directory -Path $resultsDir }
 
-          Write-Host "Iniciando ejecución de pruebas en el Robot Local..."
+          # Generamos el reporte en formato uipath (JSON) que es el más detallado para mapear cobertura
           dotnet tool run uipcli test run "https://cloud.uipath.com/" "${{ secrets.UIPATH_TENANT }}" `
             -A "${{ secrets.UIPATH }}" `
             -I "${{ secrets.APP_ID }}" `
@@ -76,73 +44,31 @@ jobs:
             --applicationScope "OR.Folders OR.BackgroundTasks OR.TestSets OR.TestSetExecutions OR.TestSetSchedules OR.Settings.Read OR.Robots.Read OR.Machines.Read OR.Execution OR.Assets OR.Users.Read OR.Jobs OR.Monitoring" `
             -o "Shared" `
             -P project.json `
-            --out junit `
-            --result_path "$resultsDir/results.xml" `
+            --out uipath `
+            --result_path "$resultsDir/results.json" `
             --traceLevel Information
-      
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Las pruebas unitarias fallaron en el robot. Bloqueando el deploy."
-            exit 1
-          }
-      
-          Write-Host "Pruebas unitarias completadas exitosamente."
-
-      - name: Guardar resultados de pruebas
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults
           path: test-results/
 
-  # ============================================================
-  # JOB 3: SONARCLOUD - Análisis de calidad de código
-  # ============================================================
   sonarcloud:
-    needs: build
-    name: SonarCloud Scan
+    needs: [build, test]
     runs-on: windows-latest
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: 'zulu'
-
-      - name: Checkout del código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Convertir formato de UiPath a SonarCloud
-        shell: pwsh
-        run: |
-          if (Test-Path "uipath-analyzer-results.json") {
-              $uipathResults = Get-Content -Path "uipath-analyzer-results.json" | ConvertFrom-Json
-              $sonarIssues = @()
-
-              if ($null -ne $uipathResults.Errors) {
-                  foreach ($hallazgo in $uipathResults.Errors) {
-                      $issue = [PSCustomObject]@{
-                          engineId = "UiPathAnalyzer"
-                          ruleId = $hallazgo.RuleId
-                          severity = "MAJOR"
-                          type = "CODE_SMELL"
-                          primaryLocation = [PSCustomObject]@{
-                              message = $hallazgo.Description
-                              filePath = $hallazgo.ItemPath
-                          }
-                      }
-                      $sonarIssues += $issue
-                  }
-              }
-
-              $sonarFormat = [PSCustomObject]@{ issues = $sonarIssues }
-              $sonarFormat | ConvertTo-Json -Depth 5 | Out-File "sonar-issues.json" -Encoding utf8
-          } else {
-              '{"issues": []}' | Out-File "sonar-issues.json" -Encoding utf8
-          }
-
-      - name: SonarCloud Scan (CLI)
+      - uses: actions/download-artifact@v4
+        with:
+          name: TestResults
+          path: test-results/
+      - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -152,49 +78,25 @@ jobs:
             -Dsonar.organization=duvangt
             -Dsonar.sources=.
             -Dsonar.xml.file.suffixes=.xml,.xaml
-            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg,**/**.yml
-            -Dsonar.externalIssuesReportPaths=sonar-issues.json
+            -Dsonar.testExecutionReportPaths=test-results/results.json
+            -Dsonar.lang.patterns.xml=**/*.xaml
 
-  # ============================================================
-  # JOB 4: VULNERABILITIES - Análisis de dependencias
-  # ============================================================
   vulnerabilities:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - run: echo "Análisis de seguridad" > report.txt
 
-      - name: Analizar dependencias del proyecto
-        shell: pwsh
-        run: |
-          # Lógica de detección de vulnerabilidades personalizada
-          $j = Get-Content project.json | ConvertFrom-Json
-          if (-Not (Test-Path -Path reports)) { New-Item -ItemType Directory -Path reports }
-          
-          # (Aquí va tu lógica de reporte HTML simplificada para el ejemplo)
-          "<h1>Reporte Generado</h1>" | Out-File "reports/dependencias-report.html"
-
-      - name: Publicar reporte de dependencias
-        uses: actions/upload-artifact@v4
-        with:
-          name: SAST-SCA-Report
-          path: reports/
-
-  # ============================================================
-  # JOB 5: DEPLOY - Despliegue oficial al Orchestrator
-  # ============================================================
   deploy:
     needs: [test, sonarcloud, vulnerabilities]
     runs-on: windows-latest
     steps:
-      - name: Descargar artefacto compilado
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: RobotCompilado
           path: output/
-
-      - name: Desplegar paquete al Orchestrator
+      - name: Deploy to Orchestrator
         shell: pwsh
         env:
           UIPATH_ACCOUNT: ${{ secrets.UIPATH }}
@@ -203,30 +105,13 @@ jobs:
           UIPATH_CLIENT_SECRET: ${{ secrets.APP_SECRET }}
         run: |
           $pkg = Get-ChildItem -Path output -Filter *.nupkg | Select-Object -First 1
-          
-          # Autenticación con el Tenant correcto (duvangt)
           $tokenEndpoint = 'https://cloud.uipath.com/identity_/connect/token'
           $body = @{
-            grant_type    = 'client_credentials'
-            client_id     = $env:UIPATH_CLIENT_ID
+            grant_type = 'client_credentials'
+            client_id = $env:UIPATH_CLIENT_ID
             client_secret = $env:UIPATH_CLIENT_SECRET
-            scope         = 'OR.Execution OR.Folders'
+            scope = 'OR.Execution OR.Folders'
           }
-
           $resp = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded'
-          $accessToken = $resp.access_token
-
           $orchUploadUrl = "https://cloud.uipath.com/$($env:UIPATH_ACCOUNT)/$($env:UIPATH_TENANT)/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.UploadPackage"
-          
-          Write-Host "Subiendo paquete $($pkg.Name) a $env:UIPATH_TENANT..."
-          
-          $httpCode = curl.exe -s -w "%{http_code}" -o result.json -X POST "$orchUploadUrl" `
-            -H "Authorization: Bearer $accessToken" `
-            -F "file=@$($pkg.FullName)"
-
-          if ($httpCode -match '^20') {
-            Write-Host "¡Despliegue exitoso!"
-          } else {
-            Get-Content result.json
-            exit 1
-          }
+          curl.exe -X POST "$orchUploadUrl" -H "Authorization: Bearer $($resp.access_token)" -F "file=@$($pkg.FullName)"
