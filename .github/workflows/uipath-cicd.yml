@@ -240,7 +240,7 @@ jobs:
             -Dsonar.projectKey=DuvanGT_rpa-uipath
             -Dsonar.organization=duvangt
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/*.nupkg, **/**/*.yml
       
       - name: Publicar reporte de dependencias
         uses: actions/upload-artifact@v4
