@@ -16,7 +16,7 @@ jobs:
           $version = "1.0.${{ github.run_number }}"
           dotnet new tool-manifest --force
           dotnet tool install UiPath.CLI.Windows
-          # Usamos --outputType Tests para que los metadatos de prueba viajen en el paquete
+          # Usamos la sintaxis correcta del manual para que no falle el Job
           dotnet tool run uipcli package pack project.json -o output -v $version --outputType Tests
       - uses: actions/upload-artifact@v4
         with:
@@ -36,7 +36,7 @@ jobs:
           $resultsDir = "test-results"
           if (-Not (Test-Path $resultsDir)) { New-Item -ItemType Directory -Path $resultsDir }
 
-          # Generamos el reporte en formato uipath (JSON) que es el más detallado para mapear cobertura
+          # VOLVEMOS A JUNIT: Es el formato XML que SonarCloud SI sabe leer sin errores
           dotnet tool run uipcli test run "https://cloud.uipath.com/" "${{ secrets.UIPATH_TENANT }}" `
             -A "${{ secrets.UIPATH }}" `
             -I "${{ secrets.APP_ID }}" `
@@ -44,8 +44,8 @@ jobs:
             --applicationScope "OR.Folders OR.BackgroundTasks OR.TestSets OR.TestSetExecutions OR.TestSetSchedules OR.Settings.Read OR.Robots.Read OR.Machines.Read OR.Execution OR.Assets OR.Users.Read OR.Jobs OR.Monitoring" `
             -o "Shared" `
             -P project.json `
-            --out uipath `
-            --result_path "$resultsDir/results.json" `
+            --out junit `
+            --result_path "$resultsDir/results.xml" `
             --traceLevel Information
       - uses: actions/upload-artifact@v4
         if: always()
@@ -78,18 +78,10 @@ jobs:
             -Dsonar.organization=duvangt
             -Dsonar.sources=.
             -Dsonar.xml.file.suffixes=.xml,.xaml
-            -Dsonar.testExecutionReportPaths=test-results/results.json
-            -Dsonar.lang.patterns.xml=**/*.xaml
-
-  vulnerabilities:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "Análisis de seguridad" > report.txt
+            -Dsonar.junit.reportPaths=test-results/results.xml
 
   deploy:
-    needs: [test, sonarcloud, vulnerabilities]
+    needs: [test, sonarcloud]
     runs-on: windows-latest
     steps:
       - uses: actions/download-artifact@v4
